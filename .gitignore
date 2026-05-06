@@ -1,0 +1,22 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 環境変数・シークレット
+.env
+.env.local
+.env.*.local
+secrets/
+
+# Logs
+*.log
+
+# Local config — 実値を含む config を別ファイル運用する場合の保険
+config.local.js
