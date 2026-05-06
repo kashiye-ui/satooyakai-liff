@@ -54,9 +54,11 @@ async function init() {
 
 async function callApi(action, payload) {
   try {
+    // Content-Type ヘッダーを指定しないことで preflight (OPTIONS) を回避する。
+    // GAS Web App は OPTIONS をサポートしないため、CORS preflight が発生するとエラーになる。
+    // body を文字列として渡すと、ブラウザは Content-Type を text/plain で送信する。
     const res = await fetch(window.APP_CONFIG.GAS_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, idToken: state.idToken, payload }),
     });
     return await res.json();
