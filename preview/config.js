@@ -6,6 +6,6 @@
 //            scope: profile, openid → 発行されたLIFF IDをここに貼る。
 //  GAS_URL : 本番と同じGASウェブアプリ（テストも本番と同じスプレッドシートに書き込む点に注意）。
 window.APP_CONFIG = {
-  LIFF_ID: '<<テスト用LIFFのIDを貼る>>',
+  LIFF_ID: '2009988645-lL2iVTRT',
   GAS_URL: 'https://script.google.com/macros/s/AKfycbzqa17JDteHDQ1eo_HnSmwhY_Jo76nI5AmCeppmm1dKd6hSP8KHPW4Yd6aOZAZkDlk0Mg/exec',
 };
