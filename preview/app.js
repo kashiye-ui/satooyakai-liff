@@ -58,7 +58,7 @@ async function init() {
     if (reauthFlagGet()) {
       reauthFlagSet(false);
       return renderError('ログイン情報の更新に失敗しました',
-        'お手数ですが、LINEでこのページを開き直してください。解決しない場合は管理者へご連絡ください。');
+        'お手数ですが、LINEでこのページを開き直してください。解決しない場合は管理者へご連絡ください。\n[診断] ' + tokenDiag());
     }
     return reauthRedirect(); // リダイレクト（戻ってこない）
   }
@@ -71,7 +71,7 @@ async function init() {
   const result = await callApi('checkUser', {});
   if (result.error === 'invalid_token') {
     return renderError('ログインの確認に失敗しました',
-      'LINEでこのページを開き直してください。解決しない場合は管理者へご連絡ください。');
+      'LINEでこのページを開き直してください。解決しない場合は管理者へご連絡ください。\n[診断] ' + tokenDiag());
   }
   if (result.ok && result.registered) {
     routeByView(result);
@@ -137,9 +137,22 @@ function tokenLooksExpired(token) {
   return Date.now() >= exp - 60000; // 期限60秒前で切れ扱い
 }
 // 再ログインしてIDトークンを取り直す（同じURLへ戻る）。リダイレクトするので以降は実行されない。
+// liff.login() はログイン済みだと何もしないことがあるため、一度ログアウトしてから強制的に再ログインする。
 function reauthRedirect() {
   reauthFlagSet(true);
+  try { if (liff.isLoggedIn && liff.isLoggedIn()) liff.logout(); } catch (e) { /* noop */ }
   liff.login({ redirectUri: location.href });
+}
+
+// 診断用：ログイン状態とトークンの様子を1行で返す（原因切り分け用）。
+function tokenDiag() {
+  let loggedIn = '?';
+  try { loggedIn = String(liff.isLoggedIn()); } catch (e) { /* noop */ }
+  const t = state.idToken;
+  const len = t ? ('len=' + t.length) : 'null';
+  let expStr = '-';
+  if (t) { const ms = decodeJwtExpMs(t); expStr = ms ? new Date(ms).toLocaleString() : 'exp無'; }
+  return `login=${loggedIn} / token=${len} / exp=${expStr} / now=${new Date().toLocaleString()}`;
 }
 
 async function callApi(action, payload) {
@@ -783,7 +796,7 @@ function renderError(title, detail) {
     <section class="screen">
       <h1>エラー</h1>
       <p>${escapeHtml(title)}</p>
-      <p class="muted">${escapeHtml(detail || '')}</p>
+      <p class="muted" style="white-space:pre-line; word-break:break-all;">${escapeHtml(detail || '')}</p>
     </section>
   `;
 }
