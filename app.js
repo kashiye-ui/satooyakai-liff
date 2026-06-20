@@ -1318,16 +1318,16 @@ function drawAdminFees() {
   const { fiscalYear, households, unpaidOnly } = state.adminFees;
   const paidN = households.filter(h => h.feePaid).length;
   const unpaidN = households.length - paidN;
-  const list = unpaidOnly ? households.filter(h => !h.feePaid) : households;
+  const list = (unpaidOnly ? households.filter(h => !h.feePaid) : households).slice()
+    .sort((a, b) => ((a.ku + a.representativeName) < (b.ku + b.representativeName) ? -1 : 1));
 
-  const row = (h, i) => `
-    <div class="card">
-      <p><strong>${escapeHtml(h.ku)} ${escapeHtml(h.representativeName)}</strong>
-         <span class="muted">${escapeHtml(h.householdId)}</span></p>
-      <button class="chip ${h.feePaid ? 'on' : 'off'} fee-toggle" data-id="${escapeAttr(h.householdId)}">
-        ${h.feePaid ? '納付済' : '未納'}
-      </button>
-    </div>`;
+  const tr = (h) => `
+    <tr>
+      <td>${escapeHtml(h.ku)}</td>
+      <td>${escapeHtml(h.representativeName)}</td>
+      <td>${escapeHtml(h.householdId)}</td>
+      <td><button class="chip ${h.feePaid ? 'on' : 'off'} fee-toggle" data-id="${escapeAttr(h.householdId)}">${h.feePaid ? '納付済' : '未納'}</button></td>
+    </tr>`;
 
   $app.innerHTML = `
     <section class="screen">
@@ -1338,9 +1338,13 @@ function drawAdminFees() {
         <p>納付済：${paidN}世帯 ／ 未納：${unpaidN}世帯（計 ${households.length}世帯）</p>
       </div>
       <label class="check"><input type="checkbox" id="unpaid-only" ${unpaidOnly ? 'checked' : ''}> 未納のみ表示</label>
-      ${list.length ? list.map(row).join('') : '<p class="muted">該当する世帯はありません。</p>'}
+      ${list.length ? `
+        <div class="tbl-wrap"><table class="tbl">
+          <thead><tr><th>区</th><th>世帯代表者</th><th>世帯ID</th><th>${fiscalYear}年度会費</th></tr></thead>
+          <tbody>${list.map(tr).join('')}</tbody>
+        </table></div>` : '<p class="muted">該当する世帯はありません。</p>'}
       <button class="btn primary" id="csv-btn" style="margin-top:8px;">未納一覧をCSVで出力</button>
-      <p class="hint">「納付済 / 未納」はタップで切り替わります（${fiscalYear}年度分）。</p>
+      <p class="hint">「納付済 / 未納」はタップで切り替わります（${fiscalYear}年度分）。表は横にスクロールできます。</p>
       <button class="btn" id="back-btn" style="margin-top:8px;">管理メニューへ</button>
     </section>
   `;
