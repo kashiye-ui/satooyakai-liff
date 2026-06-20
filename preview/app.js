@@ -311,12 +311,18 @@ function renderActionError(title, err) {
 
 // ===== 画面: 利用規約 =====
 function renderAgreement() {
+  var dbgAud = '';
+  try {
+    var _p = state.idToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    var _pad = _p + '==='.slice((_p.length + 3) % 4);
+    dbgAud = (JSON.parse(atob(_pad)).aud) || '';
+  } catch (e) { dbgAud = '(decode失敗)'; }
   $app.innerHTML = `
     <section class="screen">
       <h1>ようこそ</h1>
       <p>さいたま市里親会 公式LINE をご利用いただきありがとうございます。</p>
       <p>ご登録にあたり、利用規約およびプライバシーポリシーをご確認・同意ください。</p>
-      <p class="muted">（診断: IDトークン ${state.idToken ? 'あり・長さ' + state.idToken.length : '【なし】'} ／ ログイン ${(window.liff && liff.isLoggedIn && liff.isLoggedIn()) ? 'OK' : 'NG'}）</p>
+      <p class="muted">（診断: IDトークン ${state.idToken ? 'あり' : '【なし】'} ／ aud=<strong>${escapeHtml(dbgAud)}</strong>）</p>
       <ul class="links">
         <li><a href="#" id="open-terms">利用規約を見る</a></li>
         <li><a href="#" id="open-privacy">プライバシーポリシーを見る</a></li>
