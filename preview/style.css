@@ -243,6 +243,18 @@ input[type="text"], input[type="tel"], input[type="number"], input:not([type]), 
 .chip:disabled { opacity: 0.5; cursor: not-allowed; }
 .actions .chip { flex: 0 0 auto; }
 
+/* 管理の一覧画面はPCで広く使う（スマホは従来どおり） */
+.screen.wide { max-width: min(1040px, 96vw); }
+
+/* 検索バー＋ソート見出し */
+.toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 10px 0; }
+.search-input {
+  flex: 1 1 220px; max-width: 380px; margin-top: 0;
+  padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;
+}
+table.tbl th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
+table.tbl th.sortable:hover { background: #e8e0d2; }
+
 .tbl-wrap { overflow-x: auto; }
 table.tbl {
   border-collapse: collapse;

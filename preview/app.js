@@ -819,6 +819,47 @@ function topBar(title, backLabel) {
     </div>`;
 }
 
+// ===== 並べ替え・検索つきテーブルの共通部品 =====
+// 並べ替え可能な見出しセル。view={q,sortKey,sortDir}
+function sortTh(label, key, view) {
+  const active = view.sortKey === key;
+  const arrow = active ? (view.sortDir === 'desc' ? ' ▼' : ' ▲') : '';
+  return `<th class="sortable" data-sort="${escapeAttr(key)}">${escapeHtml(label)}${arrow}</th>`;
+}
+// 検索で絞り込み＋指定キーで並べ替えた行を返す。cols[key](row)=ソート値、searchText(row)=検索対象文字列。
+function applyTableView(rows, view, cols, searchText) {
+  let r = rows;
+  const q = (view.q || '').trim().toLowerCase();
+  if (q) r = r.filter(row => String(searchText(row) || '').toLowerCase().includes(q));
+  if (view.sortKey && cols[view.sortKey]) {
+    const dir = view.sortDir === 'desc' ? -1 : 1;
+    r = r.slice().sort((a, b) => {
+      const av = cols[view.sortKey](a), bv = cols[view.sortKey](b);
+      const c = (typeof av === 'number' && typeof bv === 'number')
+        ? av - bv
+        : String(av == null ? '' : av).localeCompare(String(bv == null ? '' : bv), 'ja');
+      return c * dir;
+    });
+  }
+  return r;
+}
+// 見出しクリック（並べ替え）と検索入力を配線し、draw を再実行する。
+function wireTableControls(view, draw) {
+  document.querySelectorAll('th.sortable').forEach(th => {
+    th.onclick = () => {
+      const k = th.dataset.sort;
+      if (view.sortKey === k) view.sortDir = (view.sortDir === 'asc' ? 'desc' : 'asc');
+      else { view.sortKey = k; view.sortDir = 'asc'; }
+      draw();
+    };
+  });
+  const s = document.getElementById('tbl-search');
+  if (s) {
+    s.oninput = () => { view.q = s.value; draw(); };
+    if (view.q) { s.focus(); const v = s.value; s.value = ''; s.value = v; } // 再描画後もフォーカス維持＋末尾
+  }
+}
+
 // ===== 管理画面（運営・理事向け / ?view=admin） =====
 async function renderAdmin() {
   $app.innerHTML = `<section class="screen"><h1>管理</h1><p>読み込み中...</p></section>`;
@@ -964,16 +1005,17 @@ async function renderAdminRoster(eventId) {
   $app.innerHTML = `<section class="screen"><h1>参加者一覧</h1><p>読み込み中...</p></section>`;
   const res = await callApi('adminEventRoster', { eventId });
   if (!res.ok) return renderActionError('参加者一覧', res.error);
-  state.adminRoster = { eventId, event: res.event, rows: res.rows || [] };
+  const prevView = (state.adminRoster && state.adminRoster.eventId === eventId) ? state.adminRoster.view : null;
+  state.adminRoster = { eventId, event: res.event, rows: res.rows || [], view: prevView || { q: '', sortKey: 'ku', sortDir: 'asc' } };
   drawAdminRoster();
 }
 
 // state.adminRoster をもとに名簿を描画する（支払トグルの即時反映に使う）
 function drawAdminRoster() {
-  const { eventId, event, rows } = state.adminRoster;
+  const { eventId, event, rows, view } = state.adminRoster;
   const hasFee = rows.some(r => r.total > 0);
 
-  // 回収集計（参加費が発生する行事のみ意味がある）
+  // 回収集計（全件ベース。参加費が発生する行事のみ意味がある）
   let collected = 0, outstanding = 0, paidN = 0, unpaidN = 0;
   rows.forEach(r => {
     if (r.total <= 0) return;
@@ -987,32 +1029,39 @@ function drawAdminRoster() {
       <p>未：${unpaidN}世帯 ／ ${outstanding.toLocaleString()}円</p>
     </div>` : '';
 
-  const trs = rows.map((r, i) => `
+  const cols = { ku: r => r.ku, rep: r => r.representativeName, adult: r => r.adultCount, child: r => r.childCount, total: r => r.total, pay: r => r.payStatus };
+  const searchText = r => `${r.ku} ${r.representativeName} ${r.notes}`;
+  const shown = applyTableView(rows, view, cols, searchText);
+
+  const trs = shown.map((r) => `
     <tr>
       <td>${escapeHtml(r.ku)}</td><td>${escapeHtml(r.representativeName)}</td>
       <td class="num">${r.adultCount}</td><td class="num">${r.childCount}</td>
       <td class="num">${r.total > 0 ? r.total.toLocaleString() : '—'}</td>
       <td>${r.total > 0
-        ? `<button class="chip ${r.payStatus === '済' ? 'on' : 'off'} pay-toggle" data-i="${i}">${r.payStatus === '済' ? '済' : '未'}</button>`
+        ? `<button class="chip ${r.payStatus === '済' ? 'on' : 'off'} pay-toggle" data-id="${escapeAttr(r.householdId)}">${r.payStatus === '済' ? '済' : '未'}</button>`
         : '<span class="muted">—</span>'}</td>
-      <td><button class="chip edit-att" data-i="${i}">編集</button></td>
+      <td><button class="chip edit-att" data-id="${escapeAttr(r.householdId)}">編集</button></td>
     </tr>`).join('');
 
   $app.innerHTML = `
-    <section class="screen">
+    <section class="screen wide">
       ${topBar('参加者一覧', '行事一覧')}
       <h1>${escapeHtml(event.name)}</h1>
-      <p class="muted">${escapeHtml(event.date || '')} ／ ${rows.length}世帯</p>
+      <p class="muted">${escapeHtml(event.date || '')} ／ ${rows.length}世帯${view.q ? `（表示 ${shown.length}）` : ''}</p>
       ${summary}
-      ${rows.length ? `
+      <div class="toolbar">
+        <input class="search-input" id="tbl-search" type="search" placeholder="区・世帯代表者・特記で検索…" value="${escapeAttr(view.q)}">
+      </div>
+      ${shown.length ? `
         <div class="tbl-wrap"><table class="tbl">
-          <thead><tr><th>区</th><th>世帯代表者</th><th>大人</th><th>子</th><th>参加費</th><th>支払</th><th></th></tr></thead>
+          <thead><tr>${sortTh('区', 'ku', view)}${sortTh('世帯代表者', 'rep', view)}${sortTh('大人', 'adult', view)}${sortTh('子', 'child', view)}${sortTh('参加費', 'total', view)}${sortTh('支払', 'pay', view)}<th></th></tr></thead>
           <tbody>${trs}</tbody>
         </table></div>
-        <p class="hint">「支払」の済/未はタップで切り替わります。${hasFee ? '' : 'この行事は参加費が無料です。'}</p>
-        <button class="btn primary" id="csv-btn" style="margin-top:8px;">CSVをダウンロード</button>
+        <p class="hint">見出しクリックで並べ替え。「支払」の済/未はタップで切替。${hasFee ? '' : 'この行事は参加費が無料です。'}</p>
+        <button class="btn primary" id="csv-btn" style="margin-top:8px;">CSVをダウンロード（全件）</button>
         <p class="hint">ダウンロードはPCのブラウザ推奨です。</p>
-      ` : '<p class="muted">まだ回答がありません。</p>'}
+      ` : '<p class="muted">該当する回答がありません。</p>'}
       <button class="btn" id="proxy-btn" style="margin-top:8px;">LINEなし世帯を代理で入力</button>
       <button class="btn" id="back-btn" style="margin-top:8px;">行事一覧へ</button>
     </section>
@@ -1020,10 +1069,11 @@ function drawAdminRoster() {
   document.getElementById('topback').onclick = renderAdminEvents;
   document.getElementById('back-btn').onclick = renderAdminEvents;
   document.getElementById('proxy-btn').onclick = () => renderProxyHouseholdPicker(eventId, event);
+  wireTableControls(view, drawAdminRoster);
 
   document.querySelectorAll('button.pay-toggle').forEach(b => {
     b.onclick = async () => {
-      const r = rows[+b.dataset.i];
+      const r = rows.find(x => x.householdId === b.dataset.id);
       const next = r.payStatus === '済' ? '未' : '済';
       b.disabled = true;
       const resp = await callApi('adminSetPayStatus', { eventId, householdId: r.householdId, payStatus: next });
@@ -1033,7 +1083,7 @@ function drawAdminRoster() {
   });
   document.querySelectorAll('button.edit-att').forEach(b => {
     b.onclick = () => {
-      const r = rows[+b.dataset.i];
+      const r = rows.find(x => x.householdId === b.dataset.id);
       renderProxyAttendanceForm(eventId, event, { householdId: r.householdId, label: `${r.ku} ${r.representativeName}` },
         { adultCount: r.adultCount, childCount: r.childCount, notes: r.notes, breakdown: r.breakdown });
     };
@@ -1133,15 +1183,28 @@ async function renderAdminHouseholds() {
   $app.innerHTML = `<section class="screen"><h1>会員名簿</h1><p>読み込み中...</p></section>`;
   const res = await callApi('adminListHouseholds', {});
   if (!res.ok) return renderActionError('会員名簿', res.error);
-  const hs = (res.households || []).slice()
-    .sort((a, b) => ((a.ku + a.representativeName) < (b.ku + b.representativeName) ? -1 : 1));
-
-  // 1会員=1行に展開（世帯順）。世帯情報は各行に繰り返す＝PCで一覧・並べ替えしやすい。
+  const hs = res.households || [];
+  // 1会員=1行に展開。世帯情報を各行に持たせる（検索・並べ替え用）。
   const rows = [];
   hs.forEach((h) => {
     const ms = (h.members && h.members.length) ? h.members : [null];
-    ms.forEach((m, mi) => rows.push({ h, m, isRep: mi === 0 }));
+    ms.forEach((m, mi) => rows.push({
+      householdId: h.householdId, ku: h.ku || '', rep: h.representativeName || '',
+      foster: h.fosterType || '', fee: h.feeStatus || '',
+      name: m ? m.name : '', role: m ? m.role : '', status: m ? m.status : '',
+      m: m, isRep: mi === 0,
+    }));
   });
+  const prevView = state.adminMembers && state.adminMembers.view;
+  state.adminMembers = { rows, hs, view: prevView || { q: '', sortKey: 'ku', sortDir: 'asc' } };
+  drawAdminMembers();
+}
+
+function drawAdminMembers() {
+  const { rows, hs, view } = state.adminMembers;
+  const cols = { ku: r => r.ku, rep: r => r.rep, name: r => r.name, role: r => r.role, foster: r => r.foster, fee: r => r.fee, status: r => r.status };
+  const searchText = r => `${r.ku} ${r.rep} ${r.name} ${r.role} ${r.foster} ${r.householdId}`;
+  const shown = applyTableView(rows, view, cols, searchText);
   const memberCount = rows.filter(r => r.m).length;
 
   const adminCell = (m) => {
@@ -1150,41 +1213,44 @@ async function renderAdminHouseholds() {
     if (isLine) return `<button class="chip ${m.isAdmin ? 'on' : ''} admin-toggle" data-uid="${escapeAttr(m.lineUserId)}" data-on="${m.isAdmin ? '1' : '0'}" data-name="${escapeAttr(m.name)}">${m.isAdmin ? '管理者' : '管理者にする'}</button>`;
     return '<span class="muted">—</span>';
   };
-  const trOf = (r) => {
-    const h = r.h, m = r.m;
-    return `<tr>
-      <td>${escapeHtml(h.ku)}</td>
-      <td>${escapeHtml(h.representativeName)}</td>
-      <td>${m ? escapeHtml(m.name) : '<span class="muted">（会員なし）</span>'}</td>
-      <td>${m ? escapeHtml(m.role) : ''}</td>
-      <td>${escapeHtml(h.fosterType || '')}</td>
-      <td>${escapeHtml(h.feeStatus || '')}</td>
-      <td>${m ? (m.status !== '有効' ? '<span class="muted">' + escapeHtml(m.status) + '</span>' : '有効') : ''}</td>
-      <td>${m ? adminCell(m) : ''}</td>
-      <td>${r.isRep ? `<button class="chip add-member" data-hid="${escapeAttr(h.householdId)}" data-label="${escapeAttr(h.ku + ' ' + h.representativeName)}">＋家族</button>` : ''}</td>
+  const trOf = (r) => `<tr>
+      <td>${escapeHtml(r.ku)}</td>
+      <td>${escapeHtml(r.rep)}</td>
+      <td>${r.m ? escapeHtml(r.name) : '<span class="muted">（会員なし）</span>'}</td>
+      <td>${escapeHtml(r.role)}</td>
+      <td>${escapeHtml(r.foster)}</td>
+      <td>${escapeHtml(r.fee)}</td>
+      <td>${r.m ? (r.status !== '有効' ? '<span class="muted">' + escapeHtml(r.status) + '</span>' : '有効') : ''}</td>
+      <td>${r.m ? adminCell(r.m) : ''}</td>
+      <td>${r.isRep ? `<button class="chip add-member" data-hid="${escapeAttr(r.householdId)}" data-label="${escapeAttr(r.ku + ' ' + r.rep)}">＋家族</button>` : ''}</td>
     </tr>`;
-  };
 
   $app.innerHTML = `
-    <section class="screen">
+    <section class="screen wide">
       ${topBar('会員名簿', '管理メニュー')}
       <h1>会員名簿</h1>
-      <p class="muted">${hs.length}世帯・${memberCount}名</p>
-      <button class="btn" id="new-h-btn">＋ LINEなし世帯を登録</button>
-      ${rows.length ? `
+      <p class="muted">${hs.length}世帯・${memberCount}名${view.q ? `（表示 ${shown.length}行）` : ''}</p>
+      <div class="toolbar">
+        <input class="search-input" id="tbl-search" type="search" placeholder="区・氏名・里親種別などで検索…" value="${escapeAttr(view.q)}">
+        <button class="btn" id="new-h-btn" style="flex:0 0 auto;">＋ LINEなし世帯を登録</button>
+      </div>
+      ${shown.length ? `
         <div class="tbl-wrap"><table class="tbl">
-          <thead><tr><th>区</th><th>世帯代表者</th><th>氏名</th><th>立場</th><th>里親種別</th><th>会費</th><th>状態</th><th>管理者</th><th>操作</th></tr></thead>
-          <tbody>${rows.map(trOf).join('')}</tbody>
+          <thead><tr>
+            ${sortTh('区', 'ku', view)}${sortTh('世帯代表者', 'rep', view)}${sortTh('氏名', 'name', view)}${sortTh('立場', 'role', view)}${sortTh('里親種別', 'foster', view)}${sortTh('会費', 'fee', view)}${sortTh('状態', 'status', view)}<th>管理者</th><th>操作</th>
+          </tr></thead>
+          <tbody>${shown.map(trOf).join('')}</tbody>
         </table></div>
-        <button class="btn primary" id="csv-btn" style="margin-top:8px;">CSVをダウンロード（個人単位）</button>
-        <p class="hint">PCのブラウザでの操作・ダウンロードを推奨します。表は横にスクロールできます。</p>
-      ` : '<p class="muted">登録された世帯がありません。</p>'}
+        <button class="btn primary" id="csv-btn" style="margin-top:8px;">CSVをダウンロード（個人単位・全件）</button>
+        <p class="hint">見出しをクリックで並べ替え。検索ボックスで絞り込み。PC推奨・表は横スクロール可。</p>
+      ` : '<p class="muted">該当する会員がいません。</p>'}
       <button class="btn" id="back-btn" style="margin-top:8px;">管理メニューへ</button>
     </section>
   `;
   document.getElementById('topback').onclick = renderAdminHome;
   document.getElementById('back-btn').onclick = renderAdminHome;
   document.getElementById('new-h-btn').onclick = renderProxyNewHousehold;
+  wireTableControls(view, drawAdminMembers);
   document.querySelectorAll('button.add-member').forEach(b => {
     b.onclick = () => renderProxyAddMember({ householdId: b.dataset.hid, label: b.dataset.label });
   });
@@ -1206,7 +1272,7 @@ async function renderAdminHouseholds() {
     csvBtn.onclick = () => {
       const header = ['世帯ID', '区', '世帯代表者', '電話', '里親種別', '会費納付', '氏名', '立場', '状態'];
       const data = [];
-      hs.forEach(h => h.members.forEach(m => data.push([h.householdId, h.ku, h.representativeName, h.phone, h.fosterType, h.feeStatus, m.name, m.role, m.status])));
+      hs.forEach(h => (h.members || []).forEach(m => data.push([h.householdId, h.ku, h.representativeName, h.phone, h.fosterType, h.feeStatus, m.name, m.role, m.status])));
       downloadCsv('members.csv', [header].concat(data));
     };
   }
@@ -1306,20 +1372,24 @@ async function renderAdminFees() {
   $app.innerHTML = `<section class="screen"><h1>会費の管理</h1><p>読み込み中...</p></section>`;
   const res = await callApi('adminListHouseholds', {});
   if (!res.ok) return renderActionError('会費の管理', res.error);
+  const prevView = state.adminFees && state.adminFees.view;
   state.adminFees = {
     fiscalYear: res.fiscalYear,
     households: (res.households || []).filter(h => h.status === '有効'),
-    unpaidOnly: false,
+    unpaidOnly: state.adminFees ? state.adminFees.unpaidOnly : false,
+    view: prevView || { q: '', sortKey: 'ku', sortDir: 'asc' },
   };
   drawAdminFees();
 }
 
 function drawAdminFees() {
-  const { fiscalYear, households, unpaidOnly } = state.adminFees;
+  const { fiscalYear, households, unpaidOnly, view } = state.adminFees;
   const paidN = households.filter(h => h.feePaid).length;
   const unpaidN = households.length - paidN;
-  const list = (unpaidOnly ? households.filter(h => !h.feePaid) : households).slice()
-    .sort((a, b) => ((a.ku + a.representativeName) < (b.ku + b.representativeName) ? -1 : 1));
+  const base = unpaidOnly ? households.filter(h => !h.feePaid) : households;
+  const cols = { ku: h => h.ku, rep: h => h.representativeName, id: h => h.householdId, fee: h => (h.feePaid ? 1 : 0) };
+  const searchText = h => `${h.ku} ${h.representativeName} ${h.householdId}`;
+  const list = applyTableView(base, view, cols, searchText);
 
   const tr = (h) => `
     <tr>
@@ -1330,26 +1400,30 @@ function drawAdminFees() {
     </tr>`;
 
   $app.innerHTML = `
-    <section class="screen">
+    <section class="screen wide">
       ${topBar('会費の管理', '管理メニュー')}
       <h1>会費の管理</h1>
       <div class="card">
         <p><strong>${fiscalYear}年度</strong></p>
         <p>納付済：${paidN}世帯 ／ 未納：${unpaidN}世帯（計 ${households.length}世帯）</p>
       </div>
-      <label class="check"><input type="checkbox" id="unpaid-only" ${unpaidOnly ? 'checked' : ''}> 未納のみ表示</label>
+      <div class="toolbar">
+        <input class="search-input" id="tbl-search" type="search" placeholder="区・世帯代表者で検索…" value="${escapeAttr(view.q)}">
+        <label class="check" style="margin-top:0;"><input type="checkbox" id="unpaid-only" ${unpaidOnly ? 'checked' : ''}> 未納のみ</label>
+      </div>
       ${list.length ? `
         <div class="tbl-wrap"><table class="tbl">
-          <thead><tr><th>区</th><th>世帯代表者</th><th>世帯ID</th><th>${fiscalYear}年度会費</th></tr></thead>
+          <thead><tr>${sortTh('区', 'ku', view)}${sortTh('世帯代表者', 'rep', view)}${sortTh('世帯ID', 'id', view)}${sortTh(fiscalYear + '年度会費', 'fee', view)}</tr></thead>
           <tbody>${list.map(tr).join('')}</tbody>
         </table></div>` : '<p class="muted">該当する世帯はありません。</p>'}
       <button class="btn primary" id="csv-btn" style="margin-top:8px;">未納一覧をCSVで出力</button>
-      <p class="hint">「納付済 / 未納」はタップで切り替わります（${fiscalYear}年度分）。表は横にスクロールできます。</p>
+      <p class="hint">見出しクリックで並べ替え。「納付済 / 未納」はタップで切替（${fiscalYear}年度分）。PC推奨・横スクロール可。</p>
       <button class="btn" id="back-btn" style="margin-top:8px;">管理メニューへ</button>
     </section>
   `;
   document.getElementById('topback').onclick = renderAdminHome;
   document.getElementById('back-btn').onclick = renderAdminHome;
+  wireTableControls(view, drawAdminFees);
   document.getElementById('unpaid-only').onchange = (e) => {
     state.adminFees.unpaidOnly = e.target.checked;
     drawAdminFees();
