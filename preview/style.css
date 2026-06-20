@@ -1,19 +1,20 @@
 :root {
-  --primary: #06c755;
-  --primary-dark: #04a548;
+  --primary: #5f9350;       /* 葉の色に寄せた、やわらかい緑（旧：原色のLINE緑） */
+  --primary-dark: #4f7e42;
   --bg: #fbf7f2;            /* 温かみのあるクリーム */
   --card: #ffffff;
-  --text: #2a2320;
-  --muted: #6b6258;
-  --border: #ece4d8;
-  --warn-bg: #fff8e1;
-  --warn-border: #ffd54f;
+  --text: #3b322b;          /* 温かみのある濃茶 */
+  --muted: #7a6f63;
+  --border: #e7ddcd;
+  --warn-bg: #fdf3d6;       /* 花の黄に寄せた淡い警告色 */
+  --warn-border: #ecd591;
   /* 淡いアクセント（背景の絵柄＝鳥・花・葉・木の実より） */
-  --pink: #f0a59c;     --pink-soft: #fdecea;
-  --green: #9ccb86;    --green-soft: #eaf4e1;
-  --blue: #9fc1e0;     --blue-soft: #e8f1f9;
-  --yellow: #ecc873;   --yellow-soft: #fdf5d9;
-  --lavender: #c3aede; --lavender-soft: #f1eaf8;
+  --pink: #e2918a;     --pink-soft: #fbe9e6;
+  --green: #8fbf78;    --green-soft: #e8f1df;
+  --blue: #93b9dd;     --blue-soft: #e6eff8;
+  --yellow: #e3c069;   --yellow-soft: #fbf2d6;
+  --lavender: #bfa9da; --lavender-soft: #efe9f7;
+  --brown: #5d4037;         /* 木の実のこげ茶（リンク等） */
 }
 
 * { box-sizing: border-box; }
@@ -59,7 +60,7 @@ h2.sub {
   font-size: 1rem;
   font-weight: 600;
   margin: 20px 0 8px;
-  color: #4a7a3a;
+  color: var(--primary-dark);
   border-left: 4px solid var(--green);
   padding-left: 8px;
 }
@@ -175,7 +176,7 @@ input[type="text"], input[type="tel"], input[type="number"], input:not([type]), 
 .card-btn:nth-of-type(4n+4) { background: var(--lavender-soft); border-left-color: var(--lavender); }
 
 .links { padding-left: 1.2em; }
-.links a { color: #5d4037; }
+.links a { color: var(--brown); }
 
 .mono {
   font-family: ui-monospace, "SF Mono", Consolas, monospace;
@@ -236,9 +237,9 @@ input[type="text"], input[type="tel"], input[type="number"], input:not([type]), 
   color: #fff;
 }
 .chip.off {
-  background: #fbe9e7;
-  border-color: #ffab91;
-  color: #c62828;
+  background: #f7e6e0;
+  border-color: #e0a596;
+  color: #a85a44;
 }
 .chip:disabled { opacity: 0.5; cursor: not-allowed; }
 .actions .chip { flex: 0 0 auto; }
@@ -272,5 +273,5 @@ table.tbl th, table.tbl td {
   padding: 6px 8px;
   white-space: nowrap;
 }
-table.tbl thead th { background: #f0f0f0; }
+table.tbl thead th { background: #f3ede1; }
 table.tbl td.num { text-align: right; }
