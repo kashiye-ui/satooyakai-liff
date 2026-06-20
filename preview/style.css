@@ -152,6 +152,38 @@ input[type="text"], input[type="tel"], input[type="number"], input:not([type]), 
   font-size: 0.85rem;
 }
 
+/* 画面上部に固定される戻りバー（長い一覧でも常に戻れる） */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -20px -16px 12px;
+  padding: 10px 14px;
+  background: rgba(247, 247, 247, 0.96);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar .back-link {
+  flex: 0 0 auto;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+.topbar .topbar-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* トグル用の小さなボタン（支払・会費・公開状態など） */
 .chip {
   display: inline-block;

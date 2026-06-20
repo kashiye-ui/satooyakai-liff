@@ -255,6 +255,7 @@ async function renderEvents() {
 
   $app.innerHTML = `
     <section class="screen">
+      ${topBar('イベント', 'マイページ')}
       <h1>イベント</h1>
       <h2 class="sub">受付中の行事</h2>
       ${open.length ? open.map(openCard).join('') : '<p class="muted">現在、受付中の行事はありません。</p>'}
@@ -262,6 +263,7 @@ async function renderEvents() {
       <button class="btn" id="home-btn" style="margin-top:24px;">マイページへ戻る</button>
     </section>
   `;
+  document.getElementById('topback').onclick = goHome;
   document.getElementById('home-btn').onclick = goHome;
   document.querySelectorAll('button.act').forEach(b => {
     b.onclick = () => {
@@ -348,11 +350,13 @@ async function renderDocs() {
 
   $app.innerHTML = `
     <section class="screen">
+      ${topBar('お役立ち資料', 'マイページ')}
       <h1>お役立ち資料</h1>
       ${body}
       <button class="btn" id="home-btn" style="margin-top:24px;">マイページへ戻る</button>
     </section>
   `;
+  document.getElementById('topback').onclick = goHome;
   document.getElementById('home-btn').onclick = goHome;
   document.querySelectorAll('button.doc-link').forEach(b => {
     b.onclick = () => {
@@ -734,6 +738,14 @@ function renderError(title, detail) {
   `;
 }
 
+// 画面上部の固定戻りバー。呼び出し側で document.getElementById('topback').onclick を設定する。
+function topBar(title, backLabel) {
+  return `<div class="topbar">
+      <button class="back-link" id="topback">‹ ${escapeHtml(backLabel || '戻る')}</button>
+      <span class="topbar-title">${escapeHtml(title)}</span>
+    </div>`;
+}
+
 // ===== 管理画面（運営・理事向け / ?view=admin） =====
 async function renderAdmin() {
   $app.innerHTML = `<section class="screen"><h1>管理</h1><p>読み込み中...</p></section>`;
@@ -786,11 +798,13 @@ async function renderAdminEvents() {
     </button>`;
   $app.innerHTML = `
     <section class="screen">
+      ${topBar('行事の参加者管理', '管理メニュー')}
       <h1>行事の参加者管理</h1>
       ${evs.length ? evs.map(card).join('') : '<p class="muted">行事がありません。</p>'}
       <button class="btn" id="back-btn" style="margin-top:24px;">管理メニューへ</button>
     </section>
   `;
+  document.getElementById('topback').onclick = renderAdminHome;
   document.getElementById('back-btn').onclick = renderAdminHome;
   document.querySelectorAll('button.admin-ev').forEach(b => {
     b.onclick = () => renderAdminRoster(b.dataset.id);
@@ -837,6 +851,7 @@ function drawAdminRoster() {
 
   $app.innerHTML = `
     <section class="screen">
+      ${topBar('参加者一覧', '行事一覧')}
       <h1>${escapeHtml(event.name)}</h1>
       <p class="muted">${escapeHtml(event.date || '')} ／ ${rows.length}世帯</p>
       ${summary}
@@ -853,6 +868,7 @@ function drawAdminRoster() {
       <button class="btn" id="back-btn" style="margin-top:8px;">行事一覧へ</button>
     </section>
   `;
+  document.getElementById('topback').onclick = renderAdminEvents;
   document.getElementById('back-btn').onclick = renderAdminEvents;
   document.getElementById('proxy-btn').onclick = () => renderProxyHouseholdPicker(eventId, event);
 
@@ -911,6 +927,7 @@ async function renderProxyHouseholdPicker(eventId, event) {
     </button>`).join('');
   $app.innerHTML = `
     <section class="screen">
+      ${topBar('代理入力する世帯', '参加者一覧')}
       <h1>代理入力する世帯</h1>
       <p class="muted">${escapeHtml(event.name)}</p>
       <p class="hint">LINEで回答できない世帯の出欠を、運営が代わりに入力します。締切後でも入力できます。</p>
@@ -918,6 +935,7 @@ async function renderProxyHouseholdPicker(eventId, event) {
       <button class="btn" id="back-btn" style="margin-top:16px;">参加者一覧へ戻る</button>
     </section>
   `;
+  document.getElementById('topback').onclick = () => renderAdminRoster(eventId);
   document.getElementById('back-btn').onclick = () => renderAdminRoster(eventId);
   document.querySelectorAll('button.pick-h').forEach(b => {
     b.onclick = () => renderProxyAttendanceForm(eventId, event,
@@ -990,6 +1008,7 @@ async function renderAdminHouseholds() {
     </div>`;
   $app.innerHTML = `
     <section class="screen">
+      ${topBar('会員名簿', '管理メニュー')}
       <h1>会員名簿</h1>
       <p class="muted">${hs.length}世帯</p>
       <button class="btn" id="new-h-btn">＋ LINEなし世帯を登録</button>
@@ -998,6 +1017,7 @@ async function renderAdminHouseholds() {
       <button class="btn" id="back-btn" style="margin-top:8px;">管理メニューへ</button>
     </section>
   `;
+  document.getElementById('topback').onclick = renderAdminHome;
   document.getElementById('back-btn').onclick = renderAdminHome;
   document.getElementById('new-h-btn').onclick = renderProxyNewHousehold;
   document.querySelectorAll('button.add-member').forEach(b => {
@@ -1150,6 +1170,7 @@ function drawAdminFees() {
 
   $app.innerHTML = `
     <section class="screen">
+      ${topBar('会費の管理', '管理メニュー')}
       <h1>会費の管理</h1>
       <div class="card">
         <p><strong>${fiscalYear}年度</strong></p>
@@ -1162,6 +1183,7 @@ function drawAdminFees() {
       <button class="btn" id="back-btn" style="margin-top:8px;">管理メニューへ</button>
     </section>
   `;
+  document.getElementById('topback').onclick = renderAdminHome;
   document.getElementById('back-btn').onclick = renderAdminHome;
   document.getElementById('unpaid-only').onchange = (e) => {
     state.adminFees.unpaidOnly = e.target.checked;
@@ -1207,6 +1229,7 @@ function drawAdminMaterials() {
     </div>`;
   $app.innerHTML = `
     <section class="screen">
+      ${topBar('資料の管理', '管理メニュー')}
       <h1>資料の管理</h1>
       <p class="hint">PDFはGoogleドライブ等の共有URLを登録します（このアプリにファイルは保存しません）。共有設定は「リンクを知っている全員が閲覧可」にしてください。</p>
       <button class="btn" id="new-btn">＋ 資料を追加</button>
@@ -1214,6 +1237,7 @@ function drawAdminMaterials() {
       <button class="btn" id="back-btn" style="margin-top:8px;">管理メニューへ</button>
     </section>
   `;
+  document.getElementById('topback').onclick = renderAdminHome;
   document.getElementById('back-btn').onclick = renderAdminHome;
   document.getElementById('new-btn').onclick = () => renderMaterialForm(null);
   document.querySelectorAll('button.mat-edit').forEach(b => {
