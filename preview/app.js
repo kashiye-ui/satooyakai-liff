@@ -316,6 +316,7 @@ function renderAgreement() {
       <h1>ようこそ</h1>
       <p>さいたま市里親会 公式LINE をご利用いただきありがとうございます。</p>
       <p>ご登録にあたり、利用規約およびプライバシーポリシーをご確認・同意ください。</p>
+      <p class="muted">（診断: IDトークン ${state.idToken ? 'あり・長さ' + state.idToken.length : '【なし】'} ／ ログイン ${(window.liff && liff.isLoggedIn && liff.isLoggedIn()) ? 'OK' : 'NG'}）</p>
       <ul class="links">
         <li><a href="#" id="open-terms">利用規約を見る</a></li>
         <li><a href="#" id="open-privacy">プライバシーポリシーを見る</a></li>
