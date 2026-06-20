@@ -75,6 +75,7 @@ async function init() {
       'LINEでこのページを開き直してください。解決しない場合は管理者へご連絡ください。\n[診断] ' + tokenDiag());
   }
   if (result.ok && result.registered) {
+    if (result.pending) return renderPending(result); // 承認待ちは内容を見せない
     routeByView(result);
   } else {
     // 未登録の場合は、どのビューで開かれても先に同意・登録を行う
@@ -110,10 +111,33 @@ function getView() {
 async function goHome() {
   const result = await callApi('checkUser', {});
   if (result.ok && result.registered) {
+    if (result.pending) return renderPending(result);
     renderHome(result);
   } else {
     renderAgreement();
   }
+}
+
+// 承認待ち画面（登録済みだが管理者承認前）
+function renderPending(data) {
+  const m = data.member || {};
+  const h = data.household || {};
+  $app.innerHTML = `
+    <section class="screen">
+      <h1>承認をお待ちください</h1>
+      <div class="card">
+        <p>ご登録ありがとうございます。</p>
+        <p>現在、運営（理事）の<strong>承認待ち</strong>です。承認されると、イベントや資料をご利用いただけます。</p>
+      </div>
+      <div class="card">
+        <p><strong>${escapeHtml(m.name || '')}</strong> さん</p>
+        <p class="muted">${escapeHtml(h.ku || '')} ${escapeHtml(h.representativeName || '')} の世帯</p>
+      </div>
+      <p class="muted">しばらくしてから、もう一度開いてご確認ください。</p>
+      <button class="btn" id="reload-btn">最新の状態に更新</button>
+    </section>
+  `;
+  document.getElementById('reload-btn').onclick = goHome;
 }
 
 // 再ログイン中フラグ（無限リダイレクト防止）。sessionStorage が無い環境でも壊れないようにする。
@@ -781,15 +805,18 @@ async function submitJoinMember() {
 function renderDone(householdId, name) {
   $app.innerHTML = `
     <section class="screen">
-      <h1>登録が完了しました</h1>
+      <h1>登録を受け付けました</h1>
       <p>さいたま市里親会へようこそ。</p>
       <div class="card">
         <p><strong>${escapeHtml(name)}</strong> さん</p>
         <p>世帯ID: ${escapeHtml(householdId)}</p>
       </div>
+      <div class="card warn">
+        <p>ご利用には<strong>運営（理事）の承認</strong>が必要です。承認されると、イベントや資料をご利用いただけるようになります。</p>
+      </div>
       <p class="muted">ご家族の方も、同じ手順で「家族として参加」からご登録いただけます。</p>
       <div class="actions">
-        <button class="btn" id="home-btn">マイページへ</button>
+        <button class="btn" id="home-btn">状態を確認</button>
         <button class="btn primary" id="close-btn">閉じる</button>
       </div>
     </section>
@@ -1196,12 +1223,12 @@ async function renderAdminHouseholds() {
     }));
   });
   const prevView = state.adminMembers && state.adminMembers.view;
-  state.adminMembers = { rows, hs, view: prevView || { q: '', sortKey: 'ku', sortDir: 'asc' } };
+  state.adminMembers = { rows, hs, pendingCount: res.pendingCount || 0, view: prevView || { q: '', sortKey: 'ku', sortDir: 'asc' } };
   drawAdminMembers();
 }
 
 function drawAdminMembers() {
-  const { rows, hs, view } = state.adminMembers;
+  const { rows, hs, view, pendingCount } = state.adminMembers;
   const cols = { ku: r => r.ku, rep: r => r.rep, name: r => r.name, role: r => r.role, foster: r => r.foster, fee: r => r.fee, status: r => r.status };
   const searchText = r => `${r.ku} ${r.rep} ${r.name} ${r.role} ${r.foster} ${r.householdId}`;
   const shown = applyTableView(rows, view, cols, searchText);
@@ -1213,6 +1240,13 @@ function drawAdminMembers() {
     if (isLine) return `<button class="chip ${m.isAdmin ? 'on' : ''} admin-toggle" data-uid="${escapeAttr(m.lineUserId)}" data-on="${m.isAdmin ? '1' : '0'}" data-name="${escapeAttr(m.name)}">${m.isAdmin ? '管理者' : '管理者にする'}</button>`;
     return '<span class="muted">—</span>';
   };
+  const statusCell = (r) => {
+    if (!r.m) return '';
+    if (r.status === '承認待ち') {
+      return `<span style="white-space:nowrap;">承認待ち<br><button class="chip on approve-btn" data-uid="${escapeAttr(r.m.lineUserId)}" data-name="${escapeAttr(r.name)}">承認</button> <button class="chip off reject-btn" data-uid="${escapeAttr(r.m.lineUserId)}" data-name="${escapeAttr(r.name)}">却下</button></span>`;
+    }
+    return r.status !== '有効' ? '<span class="muted">' + escapeHtml(r.status) + '</span>' : '有効';
+  };
   const trOf = (r) => `<tr>
       <td>${escapeHtml(r.ku)}</td>
       <td>${escapeHtml(r.rep)}</td>
@@ -1220,7 +1254,7 @@ function drawAdminMembers() {
       <td>${escapeHtml(r.role)}</td>
       <td>${escapeHtml(r.foster)}</td>
       <td>${escapeHtml(r.fee)}</td>
-      <td>${r.m ? (r.status !== '有効' ? '<span class="muted">' + escapeHtml(r.status) + '</span>' : '有効') : ''}</td>
+      <td>${statusCell(r)}</td>
       <td>${r.m ? adminCell(r.m) : ''}</td>
       <td>${r.isRep ? `<button class="chip add-member" data-hid="${escapeAttr(r.householdId)}" data-label="${escapeAttr(r.ku + ' ' + r.rep)}">＋家族</button>` : ''}</td>
     </tr>`;
@@ -1229,7 +1263,7 @@ function drawAdminMembers() {
     <section class="screen wide">
       ${topBar('会員名簿', '管理メニュー')}
       <h1>会員名簿</h1>
-      <p class="muted">${hs.length}世帯・${memberCount}名${view.q ? `（表示 ${shown.length}行）` : ''}</p>
+      <p class="muted">${hs.length}世帯・${memberCount}名${pendingCount ? ` ／ <strong style="color:var(--pink);">承認待ち ${pendingCount}件</strong>` : ''}${view.q ? `（表示 ${shown.length}行）` : ''}</p>
       <div class="toolbar">
         <input class="search-input" id="tbl-search" type="search" placeholder="区・氏名・里親種別などで検索…" value="${escapeAttr(view.q)}">
         <button class="btn" id="new-h-btn" style="flex:0 0 auto;">＋ LINEなし世帯を登録</button>
@@ -1265,6 +1299,24 @@ function drawAdminMembers() {
       const resp = await callApi('adminSetAdmin', { targetUserId: b.dataset.uid, makeAdmin: make });
       if (resp.ok) { renderAdminHouseholds(); }
       else { alert('変更に失敗しました：' + (resp.error || 'unknown')); b.disabled = false; }
+    };
+  });
+  document.querySelectorAll('button.approve-btn').forEach(b => {
+    b.onclick = async () => {
+      if (!confirm(`${b.dataset.name} さんを承認します（利用開始）。よろしいですか？`)) return;
+      b.disabled = true;
+      const resp = await callApi('adminApproveMember', { targetUserId: b.dataset.uid, approve: true });
+      if (resp.ok) { renderAdminHouseholds(); }
+      else { alert('承認に失敗しました：' + (resp.error || 'unknown')); b.disabled = false; }
+    };
+  });
+  document.querySelectorAll('button.reject-btn').forEach(b => {
+    b.onclick = async () => {
+      if (!confirm(`${b.dataset.name} さんの登録を却下します。よろしいですか？`)) return;
+      b.disabled = true;
+      const resp = await callApi('adminApproveMember', { targetUserId: b.dataset.uid, approve: false });
+      if (resp.ok) { renderAdminHouseholds(); }
+      else { alert('却下に失敗しました：' + (resp.error || 'unknown')); b.disabled = false; }
     };
   });
   const csvBtn = document.getElementById('csv-btn');
