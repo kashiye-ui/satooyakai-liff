@@ -185,7 +185,7 @@ function renderHome(data) {
   const h = data.household || {};
   $app.innerHTML = `
     <section class="screen">
-      <h1>マイページ</h1>
+      <h1>さいたま市里親会 マイページ</h1>
       <p>${escapeHtml(m.name || '')} さん、こんにちは。</p>
       <div class="card">
         <p><strong>世帯ID:</strong> ${escapeHtml(h.householdId || '')}</p>
