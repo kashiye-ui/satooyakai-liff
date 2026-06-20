@@ -28,6 +28,7 @@ const state = {
   joinHousehold: null, // 検索ヒット結果
   events: null,        // listEvents の結果キャッシュ
   adminRoster: null,   // 管理: 行事名簿 { eventId, event, rows }
+  adminEvents: null,   // 管理: 行事一覧（編集フォーム用）
   adminFees: null,     // 管理: 会費 { fiscalYear, households, unpaidOnly }
   adminMaterials: null,// 管理: 資料一覧
 };
@@ -854,24 +855,100 @@ async function renderAdminEvents() {
   const res = await callApi('adminListEvents', {});
   if (!res.ok) return renderActionError('行事の参加者管理', res.error);
   const evs = res.events || [];
-  const card = (e) => `
-    <button class="card-btn admin-ev" data-id="${escapeAttr(e.eventId)}">
-      <strong>${escapeHtml(e.name)} <span class="muted">（${escapeHtml(e.status)}）</span></strong>
-      <span>${escapeHtml(e.date)} ／ ${e.counts.households}世帯・大人${e.counts.adults}・子ども${e.counts.children}</span>
-    </button>`;
+  state.adminEvents = evs;
+  const card = (e, i) => `
+    <div class="card">
+      <p><strong>${escapeHtml(e.name)}</strong> <span class="muted">（${escapeHtml(e.status)}）${e.hasFeeSchedule ? '・区分別料金' : ''}</span></p>
+      <p class="muted">${escapeHtml(e.date)}${e.place ? ' ／ ' + escapeHtml(e.place) : ''}</p>
+      <p class="muted">${e.counts.households}世帯・大人${e.counts.adults}・子ども${e.counts.children}</p>
+      <div class="actions" style="margin-top:6px;">
+        <button class="chip roster-btn" data-id="${escapeAttr(e.eventId)}">参加者一覧</button>
+        <button class="chip ev-edit" data-i="${i}">編集</button>
+      </div>
+    </div>`;
   $app.innerHTML = `
     <section class="screen">
       ${topBar('行事の参加者管理', '管理メニュー')}
       <h1>行事の参加者管理</h1>
+      <button class="btn" id="new-ev-btn">＋ 行事を新規作成</button>
       ${evs.length ? evs.map(card).join('') : '<p class="muted">行事がありません。</p>'}
       <button class="btn" id="back-btn" style="margin-top:24px;">管理メニューへ</button>
     </section>
   `;
   document.getElementById('topback').onclick = renderAdminHome;
   document.getElementById('back-btn').onclick = renderAdminHome;
-  document.querySelectorAll('button.admin-ev').forEach(b => {
+  document.getElementById('new-ev-btn').onclick = () => renderEventForm(null);
+  document.querySelectorAll('button.roster-btn').forEach(b => {
     b.onclick = () => renderAdminRoster(b.dataset.id);
   });
+  document.querySelectorAll('button.ev-edit').forEach(b => {
+    b.onclick = () => renderEventForm(state.adminEvents[+b.dataset.i]);
+  });
+}
+
+const EVENT_STATUSES = ['募集中', '開催済', '中止'];
+const EVENT_TARGETS = ['全員', '会員のみ'];
+
+function renderEventForm(ev) {
+  const c = ev || {};
+  const multi = !!c.hasFeeSchedule;
+  const targetOpts = EVENT_TARGETS.slice();
+  if (c.target && !targetOpts.includes(c.target)) targetOpts.unshift(c.target);
+  $app.innerHTML = `
+    <section class="screen">
+      ${topBar(ev ? '行事の編集' : '行事の新規作成', '行事一覧')}
+      <h1>${ev ? '行事の編集' : '行事の新規作成'}</h1>
+      <label>行事名 <span class="req">*</span></label>
+      <input id="ev-name" value="${escapeAttr(c.name)}">
+      <label>開催日 <span class="req">*</span></label>
+      <input id="ev-date" type="date" value="${escapeAttr(c.date)}">
+      <label>開催場所</label>
+      <input id="ev-place" value="${escapeAttr(c.place)}">
+      ${multi ? `<div class="card warn"><p>この行事は<strong>区分別の料金表</strong>（夏レク等）です。料金の変更は事務局へご依頼ください。下の参加費欄は使いません。</p></div>` : `
+      <label>参加費（大人）円</label>
+      <input id="ev-af" type="number" inputmode="numeric" min="0" value="${c.adultFee != null ? c.adultFee : 0}">
+      <label>参加費（子ども）円</label>
+      <input id="ev-cf" type="number" inputmode="numeric" min="0" value="${c.childFee != null ? c.childFee : 0}">`}
+      <label>定員（世帯数・0=制限なし）</label>
+      <input id="ev-cap" type="number" inputmode="numeric" min="0" value="${c.capacity != null ? c.capacity : 0}">
+      <label>申込締切日</label>
+      <input id="ev-deadline" type="date" value="${escapeAttr(c.deadline)}">
+      <label>対象</label>
+      <select id="ev-target">${targetOpts.map(t => `<option ${c.target === t ? 'selected' : ''}>${escapeHtml(t)}</option>`).join('')}</select>
+      <label>ステータス</label>
+      <select id="ev-status">${EVENT_STATUSES.map(s => `<option ${c.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
+      <label>備考</label>
+      <input id="ev-note" value="${escapeAttr(c.note)}">
+      <div class="actions">
+        <button class="btn" id="back-btn">戻る</button>
+        <button class="btn primary" id="submit-btn">保存</button>
+      </div>
+    </section>
+  `;
+  document.getElementById('topback').onclick = renderAdminEvents;
+  document.getElementById('back-btn').onclick = renderAdminEvents;
+  document.getElementById('submit-btn').onclick = async () => {
+    const name = document.getElementById('ev-name').value.trim();
+    const date = document.getElementById('ev-date').value;
+    if (!name || !date) { alert('行事名と開催日は必須です。'); return; }
+    const payload = {
+      name, date,
+      place: document.getElementById('ev-place').value.trim(),
+      capacity: parseInt(document.getElementById('ev-cap').value, 10) || 0,
+      deadline: document.getElementById('ev-deadline').value,
+      target: document.getElementById('ev-target').value,
+      status: document.getElementById('ev-status').value,
+      note: document.getElementById('ev-note').value.trim(),
+    };
+    if (!multi) {
+      payload.adultFee = parseInt(document.getElementById('ev-af').value, 10) || 0;
+      payload.childFee = parseInt(document.getElementById('ev-cf').value, 10) || 0;
+    }
+    if (ev) payload.id = ev.eventId;
+    const res = await callApi('adminUpsertEvent', payload);
+    if (res.ok) { renderAdminEvents(); }
+    else { alert('保存に失敗しました：' + (res.error || 'unknown')); }
+  };
 }
 
 async function renderAdminRoster(eventId) {
