@@ -52,12 +52,27 @@ async function init() {
     return renderError('プロフィール取得に失敗しました', e.message);
   }
 
+  // PC等で古い（期限切れの）IDトークンが残っていると invalid_token になる。
+  // その場合はログインし直してトークンを取り直す（ループ防止フラグ付き）。
+  if (tokenLooksExpired(state.idToken)) {
+    if (reauthFlagGet()) {
+      reauthFlagSet(false);
+      return renderError('ログイン情報の更新に失敗しました',
+        'お手数ですが、LINEでこのページを開き直してください。解決しない場合は管理者へご連絡ください。');
+    }
+    return reauthRedirect(); // リダイレクト（戻ってこない）
+  }
+
   // 管理画面は登録の有無に関わらず、許可されたLINEユーザーのみ（認可はGAS側で検証）
   if (getView() === 'admin') {
     return renderAdmin();
   }
 
   const result = await callApi('checkUser', {});
+  if (result.error === 'invalid_token') {
+    return renderError('ログインの確認に失敗しました',
+      'LINEでこのページを開き直してください。解決しない場合は管理者へご連絡ください。');
+  }
   if (result.ok && result.registered) {
     routeByView(result);
   } else {
@@ -100,6 +115,33 @@ async function goHome() {
   }
 }
 
+// 再ログイン中フラグ（無限リダイレクト防止）。sessionStorage が無い環境でも壊れないようにする。
+const REAUTH_KEY = 'kl_reauth';
+function reauthFlagGet() { try { return sessionStorage.getItem(REAUTH_KEY) === '1'; } catch (e) { return false; } }
+function reauthFlagSet(on) { try { on ? sessionStorage.setItem(REAUTH_KEY, '1') : sessionStorage.removeItem(REAUTH_KEY); } catch (e) { /* noop */ } }
+
+// IDトークン(JWT)の有効期限(ミリ秒)。読めなければ 0。
+function decodeJwtExpMs(token) {
+  try {
+    let b = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const pad = b.length % 4; if (pad) b += '===='.slice(pad);
+    const obj = JSON.parse(decodeURIComponent(escape(atob(b))));
+    return obj && obj.exp ? obj.exp * 1000 : 0;
+  } catch (e) { return 0; }
+}
+// 期限切れ/欠落か。exp が読めない場合はサーバ判定に委ねる（false）。
+function tokenLooksExpired(token) {
+  if (!token) return true;
+  const exp = decodeJwtExpMs(token);
+  if (!exp) return false;
+  return Date.now() >= exp - 60000; // 期限60秒前で切れ扱い
+}
+// 再ログインしてIDトークンを取り直す（同じURLへ戻る）。リダイレクトするので以降は実行されない。
+function reauthRedirect() {
+  reauthFlagSet(true);
+  liff.login({ redirectUri: location.href });
+}
+
 async function callApi(action, payload) {
   try {
     // Content-Type ヘッダーを指定しないことで preflight (OPTIONS) を回避する。
@@ -109,7 +151,15 @@ async function callApi(action, payload) {
       method: 'POST',
       body: JSON.stringify({ action, idToken: state.idToken, payload }),
     });
-    return await res.json();
+    const data = await res.json();
+    if (data && data.error === 'invalid_token') {
+      // トークンが弾かれた。未試行なら再ログインで取り直す（PC等の期限切れ対策）。
+      if (!reauthFlagGet()) { reauthRedirect(); return await new Promise(() => {}); }
+      // 再ログイン後も弾かれる＝設定不一致等。ループせずそのまま返す。
+      return data;
+    }
+    reauthFlagSet(false); // トークンが受理されたので再ログインフラグ解除
+    return data;
   } catch (e) {
     console.error('callApi failed', e);
     return { ok: false, error: 'network_error' };
