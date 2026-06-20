@@ -416,7 +416,7 @@ async function renderDocs() {
       ${groups[cat].map(m => `
         <button class="card-btn doc-link" data-url="${escapeAttr(m.url)}">
           <strong>${escapeHtml(m.title)}</strong>
-          <span>${escapeHtml(m.publishedAt || '')}${m.visibility === '会員限定' ? '・会員限定' : ''}</span>
+          <span>${escapeHtml(m.publishedAt || '')}</span>
         </button>`).join('')}
     `).join('');
   }
@@ -1459,7 +1459,7 @@ function drawAdminMaterials() {
   const card = (m, i) => `
     <div class="card${m.status === '非公開' ? ' warn' : ''}">
       <p><strong>${escapeHtml(m.title)}</strong>
-         <span class="muted">${escapeHtml(m.category)}${m.visibility === '会員限定' ? '・会員限定' : ''}</span></p>
+         <span class="muted">${escapeHtml(m.category)}</span></p>
       <p class="muted" style="word-break:break-all;">${escapeHtml(m.url)}</p>
       <div class="actions" style="margin-top:6px;">
         <button class="chip ${m.status === '公開' ? 'on' : 'off'} mat-toggle" data-i="${i}">${escapeHtml(m.status)}</button>
@@ -1509,12 +1509,8 @@ function renderMaterialForm(m) {
       </select>
       <label>URL（PDF等の共有リンク） <span class="req">*</span></label>
       <input id="m-url" type="url" placeholder="https://drive.google.com/..." value="${escapeAttr(cur.url)}">
-      <label>公開範囲</label>
-      <div class="radios">
-        <label class="radio"><input type="radio" name="m-vis" value="公開" ${cur.visibility !== '会員限定' ? 'checked' : ''}> 全員に公開</label>
-        <label class="radio"><input type="radio" name="m-vis" value="会員限定" ${cur.visibility === '会員限定' ? 'checked' : ''}> 会員限定</label>
-      </div>
-      <label class="check"><input type="checkbox" id="m-pub" ${cur.status !== '非公開' ? 'checked' : ''}> 公開する（オフで非公開）</label>
+      <p class="hint">資料はすべて会員限定です（登録会員のみ閲覧できます）。</p>
+      <label class="check"><input type="checkbox" id="m-pub" ${cur.status !== '非公開' ? 'checked' : ''}> 公開する（オフで非公開＝会員にも表示されません）</label>
       <div class="actions">
         <button class="btn" id="back-btn">戻る</button>
         <button class="btn primary" id="submit-btn">保存</button>
@@ -1526,14 +1522,12 @@ function renderMaterialForm(m) {
     const title = document.getElementById('m-title').value.trim();
     const url = document.getElementById('m-url').value.trim();
     const category = document.getElementById('m-cat').value;
-    const visEl = document.querySelector('input[name="m-vis"]:checked');
-    const visibility = visEl ? visEl.value : '公開';
     const status = document.getElementById('m-pub').checked ? '公開' : '非公開';
     if (!title || !url) {
       alert('タイトルとURLは必須です。');
       return;
     }
-    const payload = { title, url, category, visibility, status };
+    const payload = { title, url, category, status }; // 公開範囲はサーバで常に会員限定
     if (m) payload.id = m.id;
     const res = await callApi('adminUpsertMaterial', payload);
     if (res.ok) { renderAdminMaterials(); }
