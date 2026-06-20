@@ -1124,36 +1124,52 @@ async function renderAdminHouseholds() {
   $app.innerHTML = `<section class="screen"><h1>会員名簿</h1><p>読み込み中...</p></section>`;
   const res = await callApi('adminListHouseholds', {});
   if (!res.ok) return renderActionError('会員名簿', res.error);
-  const hs = res.households || [];
-  const memberLine = (m) => {
+  const hs = (res.households || []).slice()
+    .sort((a, b) => ((a.ku + a.representativeName) < (b.ku + b.representativeName) ? -1 : 1));
+
+  // 1会員=1行に展開（世帯順）。世帯情報は各行に繰り返す＝PCで一覧・並べ替えしやすい。
+  const rows = [];
+  hs.forEach((h) => {
+    const ms = (h.members && h.members.length) ? h.members : [null];
+    ms.forEach((m, mi) => rows.push({ h, m, isRep: mi === 0 }));
+  });
+  const memberCount = rows.filter(r => r.m).length;
+
+  const adminCell = (m) => {
     const isLine = m.lineUserId && String(m.lineUserId).indexOf('U') === 0;
-    let ctl = '';
-    if (m.isFixedAdmin) {
-      ctl = '<span class="chip on" style="pointer-events:none;">管理者(固定)</span>';
-    } else if (isLine) {
-      ctl = `<button class="chip ${m.isAdmin ? 'on' : ''} admin-toggle" data-uid="${escapeAttr(m.lineUserId)}" data-on="${m.isAdmin ? '1' : '0'}" data-name="${escapeAttr(m.name)}">${m.isAdmin ? '管理者' : '管理者にする'}</button>`;
-    } else {
-      ctl = '<span class="muted">（LINEなし）</span>';
-    }
-    const st = m.status !== '有効' ? '<span class="muted">[' + escapeHtml(m.status) + ']</span>' : '';
-    return `<p>・${escapeHtml(m.name)}（${escapeHtml(m.role)}）${st} ${ctl}</p>`;
+    if (m.isFixedAdmin) return '<span class="chip on" style="pointer-events:none;">固定</span>';
+    if (isLine) return `<button class="chip ${m.isAdmin ? 'on' : ''} admin-toggle" data-uid="${escapeAttr(m.lineUserId)}" data-on="${m.isAdmin ? '1' : '0'}" data-name="${escapeAttr(m.name)}">${m.isAdmin ? '管理者' : '管理者にする'}</button>`;
+    return '<span class="muted">—</span>';
   };
-  const card = (h, i) => `
-    <div class="card">
-      <p><strong>${escapeHtml(h.ku)} ${escapeHtml(h.representativeName)}</strong>
-         <span class="muted">${escapeHtml(h.householdId)}${h.fosterType ? '・' + escapeHtml(h.fosterType) : ''}</span></p>
-      <p class="muted">${escapeHtml(h.phone || '')}${h.feeStatus ? ' ／ 会費:' + escapeHtml(h.feeStatus) : ''}</p>
-      ${h.members.map(memberLine).join('')}
-      <button class="chip add-member" data-i="${i}" style="margin-top:6px;">＋ 家族を追加（LINEなし）</button>
-    </div>`;
+  const trOf = (r) => {
+    const h = r.h, m = r.m;
+    return `<tr>
+      <td>${escapeHtml(h.ku)}</td>
+      <td>${escapeHtml(h.representativeName)}</td>
+      <td>${m ? escapeHtml(m.name) : '<span class="muted">（会員なし）</span>'}</td>
+      <td>${m ? escapeHtml(m.role) : ''}</td>
+      <td>${escapeHtml(h.fosterType || '')}</td>
+      <td>${escapeHtml(h.feeStatus || '')}</td>
+      <td>${m ? (m.status !== '有効' ? '<span class="muted">' + escapeHtml(m.status) + '</span>' : '有効') : ''}</td>
+      <td>${m ? adminCell(m) : ''}</td>
+      <td>${r.isRep ? `<button class="chip add-member" data-hid="${escapeAttr(h.householdId)}" data-label="${escapeAttr(h.ku + ' ' + h.representativeName)}">＋家族</button>` : ''}</td>
+    </tr>`;
+  };
+
   $app.innerHTML = `
     <section class="screen">
       ${topBar('会員名簿', '管理メニュー')}
       <h1>会員名簿</h1>
-      <p class="muted">${hs.length}世帯</p>
+      <p class="muted">${hs.length}世帯・${memberCount}名</p>
       <button class="btn" id="new-h-btn">＋ LINEなし世帯を登録</button>
-      ${hs.length ? hs.map(card).join('') : '<p class="muted">登録された世帯がありません。</p>'}
-      ${hs.length ? '<button class="btn primary" id="csv-btn">CSVをダウンロード（個人単位）</button><p class="hint">ダウンロードはPCのブラウザ推奨です。</p>' : ''}
+      ${rows.length ? `
+        <div class="tbl-wrap"><table class="tbl">
+          <thead><tr><th>区</th><th>世帯代表者</th><th>氏名</th><th>立場</th><th>里親種別</th><th>会費</th><th>状態</th><th>管理者</th><th>操作</th></tr></thead>
+          <tbody>${rows.map(trOf).join('')}</tbody>
+        </table></div>
+        <button class="btn primary" id="csv-btn" style="margin-top:8px;">CSVをダウンロード（個人単位）</button>
+        <p class="hint">PCのブラウザでの操作・ダウンロードを推奨します。表は横にスクロールできます。</p>
+      ` : '<p class="muted">登録された世帯がありません。</p>'}
       <button class="btn" id="back-btn" style="margin-top:8px;">管理メニューへ</button>
     </section>
   `;
@@ -1161,15 +1177,11 @@ async function renderAdminHouseholds() {
   document.getElementById('back-btn').onclick = renderAdminHome;
   document.getElementById('new-h-btn').onclick = renderProxyNewHousehold;
   document.querySelectorAll('button.add-member').forEach(b => {
-    b.onclick = () => {
-      const h = hs[+b.dataset.i];
-      renderProxyAddMember({ householdId: h.householdId, label: `${h.ku} ${h.representativeName}` });
-    };
+    b.onclick = () => renderProxyAddMember({ householdId: b.dataset.hid, label: b.dataset.label });
   });
   document.querySelectorAll('button.admin-toggle').forEach(b => {
     b.onclick = async () => {
-      const isOn = b.dataset.on === '1';
-      const make = !isOn;
+      const make = b.dataset.on !== '1';
       const msg = make
         ? `${b.dataset.name} さんに管理者権限を付与します。\n会員名簿・電話番号・CSVなど、すべての会員情報を閲覧できるようになります。よろしいですか？`
         : `${b.dataset.name} さんの管理者権限を解除します。よろしいですか？`;
