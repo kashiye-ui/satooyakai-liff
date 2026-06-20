@@ -27,6 +27,9 @@ const state = {
   newHousehold: null, // { ku, lastName, firstName, phone, fosterType }
   joinHousehold: null, // 検索ヒット結果
   events: null,        // listEvents の結果キャッシュ
+  adminRoster: null,   // 管理: 行事名簿 { eventId, event, rows }
+  adminFees: null,     // 管理: 会費 { fiscalYear, households, unpaidOnly }
+  adminMaterials: null,// 管理: 資料一覧
 };
 
 const $app = document.getElementById('app');
@@ -693,13 +696,17 @@ function renderAdminHome() {
   $app.innerHTML = `
     <section class="screen">
       <h1>管理メニュー</h1>
-      <button class="card-btn" id="a-events"><strong>行事の参加者管理</strong><span>申込状況の確認・CSV出力</span></button>
-      <button class="card-btn" id="a-members"><strong>会員名簿</strong><span>世帯・個人の一覧・CSV出力</span></button>
+      <button class="card-btn" id="a-events"><strong>行事の参加者管理</strong><span>申込状況・参加費の回収・代理入力・CSV出力</span></button>
+      <button class="card-btn" id="a-members"><strong>会員名簿</strong><span>世帯・個人の一覧・LINEなし世帯の代理登録・CSV出力</span></button>
+      <button class="card-btn" id="a-fees"><strong>会費の管理</strong><span>年会費の納付状況・未納一覧</span></button>
+      <button class="card-btn" id="a-materials"><strong>資料の管理</strong><span>会報・しおり等の追加・公開/非公開</span></button>
       <button class="btn" id="home-btn" style="margin-top:24px;">マイページへ戻る</button>
     </section>
   `;
   document.getElementById('a-events').onclick = renderAdminEvents;
   document.getElementById('a-members').onclick = renderAdminHouseholds;
+  document.getElementById('a-fees').onclick = renderAdminFees;
+  document.getElementById('a-materials').onclick = renderAdminMaterials;
   document.getElementById('home-btn').onclick = goHome;
 }
 
@@ -730,29 +737,79 @@ async function renderAdminRoster(eventId) {
   $app.innerHTML = `<section class="screen"><h1>参加者一覧</h1><p>読み込み中...</p></section>`;
   const res = await callApi('adminEventRoster', { eventId });
   if (!res.ok) return renderActionError('参加者一覧', res.error);
-  const rows = res.rows || [];
-  const trs = rows.map(r => `
+  state.adminRoster = { eventId, event: res.event, rows: res.rows || [] };
+  drawAdminRoster();
+}
+
+// state.adminRoster をもとに名簿を描画する（支払トグルの即時反映に使う）
+function drawAdminRoster() {
+  const { eventId, event, rows } = state.adminRoster;
+  const hasFee = rows.some(r => r.total > 0);
+
+  // 回収集計（参加費が発生する行事のみ意味がある）
+  let collected = 0, outstanding = 0, paidN = 0, unpaidN = 0;
+  rows.forEach(r => {
+    if (r.total <= 0) return;
+    if (r.payStatus === '済') { collected += r.total; paidN++; }
+    else { outstanding += r.total; unpaidN++; }
+  });
+  const summary = hasFee ? `
+    <div class="card">
+      <p><strong>参加費の回収</strong></p>
+      <p>済：${paidN}世帯 ／ ${collected.toLocaleString()}円</p>
+      <p>未：${unpaidN}世帯 ／ ${outstanding.toLocaleString()}円</p>
+    </div>` : '';
+
+  const trs = rows.map((r, i) => `
     <tr>
       <td>${escapeHtml(r.ku)}</td><td>${escapeHtml(r.representativeName)}</td>
       <td class="num">${r.adultCount}</td><td class="num">${r.childCount}</td>
-      <td>${escapeHtml(r.payStatus)}</td><td>${escapeHtml(r.notes)}</td>
+      <td class="num">${r.total > 0 ? r.total.toLocaleString() : '—'}</td>
+      <td>${r.total > 0
+        ? `<button class="chip ${r.payStatus === '済' ? 'on' : 'off'} pay-toggle" data-i="${i}">${r.payStatus === '済' ? '済' : '未'}</button>`
+        : '<span class="muted">—</span>'}</td>
+      <td><button class="chip edit-att" data-i="${i}">編集</button></td>
     </tr>`).join('');
+
   $app.innerHTML = `
     <section class="screen">
-      <h1>${escapeHtml(res.event.name)}</h1>
-      <p class="muted">${escapeHtml(res.event.date || '')} ／ ${rows.length}世帯</p>
+      <h1>${escapeHtml(event.name)}</h1>
+      <p class="muted">${escapeHtml(event.date || '')} ／ ${rows.length}世帯</p>
+      ${summary}
       ${rows.length ? `
         <div class="tbl-wrap"><table class="tbl">
-          <thead><tr><th>区</th><th>世帯代表者</th><th>大人</th><th>子</th><th>支払</th><th>特記</th></tr></thead>
+          <thead><tr><th>区</th><th>世帯代表者</th><th>大人</th><th>子</th><th>参加費</th><th>支払</th><th></th></tr></thead>
           <tbody>${trs}</tbody>
         </table></div>
-        <button class="btn primary" id="csv-btn" style="margin-top:16px;">CSVをダウンロード</button>
+        <p class="hint">「支払」の済/未はタップで切り替わります。${hasFee ? '' : 'この行事は参加費が無料です。'}</p>
+        <button class="btn primary" id="csv-btn" style="margin-top:8px;">CSVをダウンロード</button>
         <p class="hint">ダウンロードはPCのブラウザ推奨です。</p>
       ` : '<p class="muted">まだ回答がありません。</p>'}
+      <button class="btn" id="proxy-btn" style="margin-top:8px;">LINEなし世帯を代理で入力</button>
       <button class="btn" id="back-btn" style="margin-top:8px;">行事一覧へ</button>
     </section>
   `;
   document.getElementById('back-btn').onclick = renderAdminEvents;
+  document.getElementById('proxy-btn').onclick = () => renderProxyHouseholdPicker(eventId, event.name);
+
+  document.querySelectorAll('button.pay-toggle').forEach(b => {
+    b.onclick = async () => {
+      const r = rows[+b.dataset.i];
+      const next = r.payStatus === '済' ? '未' : '済';
+      b.disabled = true;
+      const resp = await callApi('adminSetPayStatus', { eventId, householdId: r.householdId, payStatus: next });
+      if (resp.ok) { r.payStatus = next; drawAdminRoster(); }
+      else { alert('支払状況の更新に失敗しました：' + (resp.error || 'unknown')); b.disabled = false; }
+    };
+  });
+  document.querySelectorAll('button.edit-att').forEach(b => {
+    b.onclick = () => {
+      const r = rows[+b.dataset.i];
+      renderProxyAttendanceForm(eventId, event.name, { householdId: r.householdId, label: `${r.ku} ${r.representativeName}` },
+        { adultCount: r.adultCount, childCount: r.childCount, notes: r.notes });
+    };
+  });
+
   const csvBtn = document.getElementById('csv-btn');
   if (csvBtn) {
     csvBtn.onclick = () => {
@@ -763,28 +820,103 @@ async function renderAdminRoster(eventId) {
   }
 }
 
+// 代理入力：世帯を選ぶ → 出欠フォーム
+async function renderProxyHouseholdPicker(eventId, eventName) {
+  $app.innerHTML = `<section class="screen"><h1>代理入力</h1><p>世帯を読み込み中...</p></section>`;
+  const res = await callApi('adminListHouseholds', {});
+  if (!res.ok) return renderActionError('代理入力', res.error);
+  const hs = (res.households || []).filter(h => h.status === '有効');
+  const cards = hs.map(h => `
+    <button class="card-btn pick-h" data-id="${escapeAttr(h.householdId)}" data-label="${escapeAttr(h.ku + ' ' + h.representativeName)}">
+      <strong>${escapeHtml(h.ku)} ${escapeHtml(h.representativeName)}</strong>
+      <span>${escapeHtml(h.householdId)}${h.fosterType ? '・' + escapeHtml(h.fosterType) : ''}</span>
+    </button>`).join('');
+  $app.innerHTML = `
+    <section class="screen">
+      <h1>代理入力する世帯</h1>
+      <p class="muted">${escapeHtml(eventName)}</p>
+      <p class="hint">LINEで回答できない世帯の出欠を、運営が代わりに入力します。締切後でも入力できます。</p>
+      ${hs.length ? cards : '<p class="muted">世帯がありません。</p>'}
+      <button class="btn" id="back-btn" style="margin-top:16px;">参加者一覧へ戻る</button>
+    </section>
+  `;
+  document.getElementById('back-btn').onclick = () => renderAdminRoster(eventId);
+  document.querySelectorAll('button.pick-h').forEach(b => {
+    b.onclick = () => renderProxyAttendanceForm(eventId, eventName,
+      { householdId: b.dataset.id, label: b.dataset.label }, {});
+  });
+}
+
+function renderProxyAttendanceForm(eventId, eventName, hh, cur) {
+  cur = cur || {};
+  $app.innerHTML = `
+    <section class="screen">
+      <h1>代理で出欠を入力</h1>
+      <div class="card">
+        <p><strong>${escapeHtml(eventName)}</strong></p>
+        <p class="muted">${escapeHtml(hh.label)}</p>
+      </div>
+      <label>参加する大人の人数 <span class="req">*</span></label>
+      <input id="adult" type="number" inputmode="numeric" min="0" value="${cur.adultCount != null ? cur.adultCount : 1}">
+      <label>参加する子どもの人数 <span class="req">*</span></label>
+      <input id="child" type="number" inputmode="numeric" min="0" value="${cur.childCount != null ? cur.childCount : 0}">
+      <label>特記事項（任意）</label>
+      <input id="notes" type="text" value="${escapeAttr(cur.notes)}">
+      <p class="hint">欠席の場合は大人・子どもとも 0 にしてください。支払状況は名簿側で管理します。</p>
+      <div class="actions">
+        <button class="btn" id="back-btn">戻る</button>
+        <button class="btn primary" id="submit-btn">この内容で登録</button>
+      </div>
+    </section>
+  `;
+  document.getElementById('back-btn').onclick = () => renderAdminRoster(eventId);
+  document.getElementById('submit-btn').onclick = async () => {
+    const adultCount = parseInt(document.getElementById('adult').value, 10);
+    const childCount = parseInt(document.getElementById('child').value, 10);
+    const notes = document.getElementById('notes').value.trim();
+    if (isNaN(adultCount) || isNaN(childCount) || adultCount < 0 || childCount < 0) {
+      alert('参加人数を正しく入力してください。');
+      return;
+    }
+    const res = await callApi('adminSubmitAttendance', {
+      eventId, householdId: hh.householdId, adultCount, childCount, notes,
+    });
+    if (res.ok) { renderAdminRoster(eventId); }
+    else { alert('登録に失敗しました：' + (res.error || 'unknown')); }
+  };
+}
+
 async function renderAdminHouseholds() {
   $app.innerHTML = `<section class="screen"><h1>会員名簿</h1><p>読み込み中...</p></section>`;
   const res = await callApi('adminListHouseholds', {});
   if (!res.ok) return renderActionError('会員名簿', res.error);
   const hs = res.households || [];
-  const card = (h) => `
+  const card = (h, i) => `
     <div class="card">
       <p><strong>${escapeHtml(h.ku)} ${escapeHtml(h.representativeName)}</strong>
          <span class="muted">${escapeHtml(h.householdId)}${h.fosterType ? '・' + escapeHtml(h.fosterType) : ''}</span></p>
       <p class="muted">${escapeHtml(h.phone || '')}${h.feeStatus ? ' ／ 会費:' + escapeHtml(h.feeStatus) : ''}</p>
       ${h.members.map(m => `<p>・${escapeHtml(m.name)}（${escapeHtml(m.role)}）${m.status !== '有効' ? '<span class="muted">[' + escapeHtml(m.status) + ']</span>' : ''}</p>`).join('')}
+      <button class="chip add-member" data-i="${i}" style="margin-top:6px;">＋ 家族を追加（LINEなし）</button>
     </div>`;
   $app.innerHTML = `
     <section class="screen">
       <h1>会員名簿</h1>
       <p class="muted">${hs.length}世帯</p>
+      <button class="btn" id="new-h-btn">＋ LINEなし世帯を登録</button>
       ${hs.length ? hs.map(card).join('') : '<p class="muted">登録された世帯がありません。</p>'}
       ${hs.length ? '<button class="btn primary" id="csv-btn">CSVをダウンロード（個人単位）</button><p class="hint">ダウンロードはPCのブラウザ推奨です。</p>' : ''}
       <button class="btn" id="back-btn" style="margin-top:8px;">管理メニューへ</button>
     </section>
   `;
   document.getElementById('back-btn').onclick = renderAdminHome;
+  document.getElementById('new-h-btn').onclick = renderProxyNewHousehold;
+  document.querySelectorAll('button.add-member').forEach(b => {
+    b.onclick = () => {
+      const h = hs[+b.dataset.i];
+      renderProxyAddMember({ householdId: h.householdId, label: `${h.ku} ${h.representativeName}` });
+    };
+  });
   const csvBtn = document.getElementById('csv-btn');
   if (csvBtn) {
     csvBtn.onclick = () => {
@@ -794,6 +926,253 @@ async function renderAdminHouseholds() {
       downloadCsv('members.csv', [header].concat(data));
     };
   }
+}
+
+// 代理：LINEなし世帯の新規登録（世帯＋世帯代表者）
+function renderProxyNewHousehold() {
+  $app.innerHTML = `
+    <section class="screen">
+      <h1>LINEなし世帯の登録</h1>
+      <p class="hint">紙で受け付けた、LINEを使わない世帯を運営が登録します。</p>
+      <label>世帯代表者のお名前 <span class="req">*</span></label>
+      <div class="row">
+        <input id="lastName" placeholder="姓">
+        <input id="firstName" placeholder="名">
+      </div>
+      <label>お住まいの区 <span class="req">*</span></label>
+      <select id="ku">
+        <option value="">選択してください</option>
+        ${KU_OPTIONS.map(k => `<option value="${k}">${k}</option>`).join('')}
+      </select>
+      <label>ご連絡先電話番号</label>
+      <input id="phone" type="tel" placeholder="048-xxx-xxxx">
+      <label>里親種別 <span class="req">*</span></label>
+      <div class="radios">
+        ${FOSTER_TYPES.map(f => `<label class="radio"><input type="radio" name="fosterType" value="${f}"> ${f}</label>`).join('')}
+      </div>
+      <div class="actions">
+        <button class="btn" id="back-btn">戻る</button>
+        <button class="btn primary" id="submit-btn">登録</button>
+      </div>
+    </section>
+  `;
+  document.getElementById('back-btn').onclick = renderAdminHouseholds;
+  document.getElementById('submit-btn').onclick = async () => {
+    const lastName = document.getElementById('lastName').value.trim();
+    const firstName = document.getElementById('firstName').value.trim();
+    const ku = document.getElementById('ku').value;
+    const phone = document.getElementById('phone').value.trim();
+    const ftEl = document.querySelector('input[name="fosterType"]:checked');
+    const fosterType = ftEl ? ftEl.value : '';
+    if (!lastName || !firstName || !ku || !fosterType) {
+      alert('代表者氏名・区・里親種別は必須です。');
+      return;
+    }
+    const fullName = `${lastName} ${firstName}`;
+    const res = await callApi('adminRegisterHousehold', {
+      household: { representativeName: fullName, ku, phone, fosterType },
+      member: { name: fullName },
+    });
+    if (res.ok) { renderAdminHouseholds(); }
+    else if (res.error === 'duplicate_household') {
+      alert('同じ区・代表者名の世帯が既に登録されています（' + (res.existing ? res.existing.householdId : '') + '）。');
+    } else { alert('登録に失敗しました：' + (res.error || 'unknown')); }
+  };
+}
+
+// 代理：既存世帯にLINEなし家族を追加
+function renderProxyAddMember(hh) {
+  $app.innerHTML = `
+    <section class="screen">
+      <h1>家族を追加（LINEなし）</h1>
+      <div class="card"><p>${escapeHtml(hh.label)} さんの世帯</p></div>
+      <label>世帯内でのお立場 <span class="req">*</span></label>
+      <div class="radios">
+        ${JOIN_ROLES.map(r => `<label class="radio"><input type="radio" name="role" value="${r}"> ${r}</label>`).join('')}
+      </div>
+      <label>お名前 <span class="req">*</span></label>
+      <div class="row">
+        <input id="lastName" placeholder="姓">
+        <input id="firstName" placeholder="名">
+      </div>
+      <div class="actions">
+        <button class="btn" id="back-btn">戻る</button>
+        <button class="btn primary" id="submit-btn">追加</button>
+      </div>
+    </section>
+  `;
+  document.getElementById('back-btn').onclick = renderAdminHouseholds;
+  document.getElementById('submit-btn').onclick = async () => {
+    const roleEl = document.querySelector('input[name="role"]:checked');
+    const role = roleEl ? roleEl.value : '';
+    const lastName = document.getElementById('lastName').value.trim();
+    const firstName = document.getElementById('firstName').value.trim();
+    if (!role || !lastName || !firstName) {
+      alert('立場と氏名は必須です。');
+      return;
+    }
+    const res = await callApi('adminAddMember', { householdId: hh.householdId, role, name: `${lastName} ${firstName}` });
+    if (res.ok) { renderAdminHouseholds(); }
+    else { alert('追加に失敗しました：' + (res.error || 'unknown')); }
+  };
+}
+
+// ===== 管理: 会費の管理 =====
+async function renderAdminFees() {
+  $app.innerHTML = `<section class="screen"><h1>会費の管理</h1><p>読み込み中...</p></section>`;
+  const res = await callApi('adminListHouseholds', {});
+  if (!res.ok) return renderActionError('会費の管理', res.error);
+  state.adminFees = {
+    fiscalYear: res.fiscalYear,
+    households: (res.households || []).filter(h => h.status === '有効'),
+    unpaidOnly: false,
+  };
+  drawAdminFees();
+}
+
+function drawAdminFees() {
+  const { fiscalYear, households, unpaidOnly } = state.adminFees;
+  const paidN = households.filter(h => h.feePaid).length;
+  const unpaidN = households.length - paidN;
+  const list = unpaidOnly ? households.filter(h => !h.feePaid) : households;
+
+  const row = (h, i) => `
+    <div class="card">
+      <p><strong>${escapeHtml(h.ku)} ${escapeHtml(h.representativeName)}</strong>
+         <span class="muted">${escapeHtml(h.householdId)}</span></p>
+      <button class="chip ${h.feePaid ? 'on' : 'off'} fee-toggle" data-id="${escapeAttr(h.householdId)}">
+        ${h.feePaid ? '納付済' : '未納'}
+      </button>
+    </div>`;
+
+  $app.innerHTML = `
+    <section class="screen">
+      <h1>会費の管理</h1>
+      <div class="card">
+        <p><strong>${fiscalYear}年度</strong></p>
+        <p>納付済：${paidN}世帯 ／ 未納：${unpaidN}世帯（計 ${households.length}世帯）</p>
+      </div>
+      <label class="check"><input type="checkbox" id="unpaid-only" ${unpaidOnly ? 'checked' : ''}> 未納のみ表示</label>
+      ${list.length ? list.map(row).join('') : '<p class="muted">該当する世帯はありません。</p>'}
+      <button class="btn primary" id="csv-btn" style="margin-top:8px;">未納一覧をCSVで出力</button>
+      <p class="hint">「納付済 / 未納」はタップで切り替わります（${fiscalYear}年度分）。</p>
+      <button class="btn" id="back-btn" style="margin-top:8px;">管理メニューへ</button>
+    </section>
+  `;
+  document.getElementById('back-btn').onclick = renderAdminHome;
+  document.getElementById('unpaid-only').onchange = (e) => {
+    state.adminFees.unpaidOnly = e.target.checked;
+    drawAdminFees();
+  };
+  document.getElementById('csv-btn').onclick = () => {
+    const header = ['世帯ID', '区', '世帯代表者', `${fiscalYear}年度会費`];
+    const data = households.filter(h => !h.feePaid).map(h => [h.householdId, h.ku, h.representativeName, '未納']);
+    downloadCsv(`fees_unpaid_${fiscalYear}.csv`, [header].concat(data));
+  };
+  document.querySelectorAll('button.fee-toggle').forEach(b => {
+    b.onclick = async () => {
+      const h = households.find(x => x.householdId === b.dataset.id);
+      const next = !h.feePaid;
+      b.disabled = true;
+      const resp = await callApi('adminSetFeeStatus', { householdId: h.householdId, paid: next });
+      if (resp.ok) { h.feePaid = next; h.feeStatus = resp.feeStatus; drawAdminFees(); }
+      else { alert('会費の更新に失敗しました：' + (resp.error || 'unknown')); b.disabled = false; }
+    };
+  });
+}
+
+// ===== 管理: 資料の管理 =====
+async function renderAdminMaterials() {
+  $app.innerHTML = `<section class="screen"><h1>資料の管理</h1><p>読み込み中...</p></section>`;
+  const res = await callApi('adminListAllMaterials', {});
+  if (!res.ok) return renderActionError('資料の管理', res.error);
+  state.adminMaterials = res.materials || [];
+  drawAdminMaterials();
+}
+
+function drawAdminMaterials() {
+  const mats = state.adminMaterials;
+  const card = (m, i) => `
+    <div class="card${m.status === '非公開' ? ' warn' : ''}">
+      <p><strong>${escapeHtml(m.title)}</strong>
+         <span class="muted">${escapeHtml(m.category)}${m.visibility === '会員限定' ? '・会員限定' : ''}</span></p>
+      <p class="muted" style="word-break:break-all;">${escapeHtml(m.url)}</p>
+      <div class="actions" style="margin-top:6px;">
+        <button class="chip ${m.status === '公開' ? 'on' : 'off'} mat-toggle" data-i="${i}">${escapeHtml(m.status)}</button>
+        <button class="chip mat-edit" data-i="${i}">編集</button>
+      </div>
+    </div>`;
+  $app.innerHTML = `
+    <section class="screen">
+      <h1>資料の管理</h1>
+      <p class="hint">PDFはGoogleドライブ等の共有URLを登録します（このアプリにファイルは保存しません）。共有設定は「リンクを知っている全員が閲覧可」にしてください。</p>
+      <button class="btn" id="new-btn">＋ 資料を追加</button>
+      ${mats.length ? mats.map(card).join('') : '<p class="muted">資料がありません。</p>'}
+      <button class="btn" id="back-btn" style="margin-top:8px;">管理メニューへ</button>
+    </section>
+  `;
+  document.getElementById('back-btn').onclick = renderAdminHome;
+  document.getElementById('new-btn').onclick = () => renderMaterialForm(null);
+  document.querySelectorAll('button.mat-edit').forEach(b => {
+    b.onclick = () => renderMaterialForm(mats[+b.dataset.i]);
+  });
+  document.querySelectorAll('button.mat-toggle').forEach(b => {
+    b.onclick = async () => {
+      const m = mats[+b.dataset.i];
+      const next = m.status === '公開' ? '非公開' : '公開';
+      b.disabled = true;
+      const resp = await callApi('adminSetMaterialStatus', { id: m.id, status: next });
+      if (resp.ok) { m.status = next; drawAdminMaterials(); }
+      else { alert('公開状態の更新に失敗しました：' + (resp.error || 'unknown')); b.disabled = false; }
+    };
+  });
+}
+
+const MATERIAL_CATEGORIES = ['会報', 'しおり', '総会資料', 'Q&A', 'その他'];
+
+function renderMaterialForm(m) {
+  const cur = m || { title: '', category: 'その他', url: '', visibility: '公開', status: '公開' };
+  $app.innerHTML = `
+    <section class="screen">
+      <h1>${m ? '資料の編集' : '資料の追加'}</h1>
+      <label>タイトル <span class="req">*</span></label>
+      <input id="m-title" value="${escapeAttr(cur.title)}">
+      <label>カテゴリ</label>
+      <select id="m-cat">
+        ${MATERIAL_CATEGORIES.map(c => `<option value="${c}" ${cur.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+      </select>
+      <label>URL（PDF等の共有リンク） <span class="req">*</span></label>
+      <input id="m-url" type="url" placeholder="https://drive.google.com/..." value="${escapeAttr(cur.url)}">
+      <label>公開範囲</label>
+      <div class="radios">
+        <label class="radio"><input type="radio" name="m-vis" value="公開" ${cur.visibility !== '会員限定' ? 'checked' : ''}> 全員に公開</label>
+        <label class="radio"><input type="radio" name="m-vis" value="会員限定" ${cur.visibility === '会員限定' ? 'checked' : ''}> 会員限定</label>
+      </div>
+      <label class="check"><input type="checkbox" id="m-pub" ${cur.status !== '非公開' ? 'checked' : ''}> 公開する（オフで非公開）</label>
+      <div class="actions">
+        <button class="btn" id="back-btn">戻る</button>
+        <button class="btn primary" id="submit-btn">保存</button>
+      </div>
+    </section>
+  `;
+  document.getElementById('back-btn').onclick = renderAdminMaterials;
+  document.getElementById('submit-btn').onclick = async () => {
+    const title = document.getElementById('m-title').value.trim();
+    const url = document.getElementById('m-url').value.trim();
+    const category = document.getElementById('m-cat').value;
+    const visEl = document.querySelector('input[name="m-vis"]:checked');
+    const visibility = visEl ? visEl.value : '公開';
+    const status = document.getElementById('m-pub').checked ? '公開' : '非公開';
+    if (!title || !url) {
+      alert('タイトルとURLは必須です。');
+      return;
+    }
+    const payload = { title, url, category, visibility, status };
+    if (m) payload.id = m.id;
+    const res = await callApi('adminUpsertMaterial', payload);
+    if (res.ok) { renderAdminMaterials(); }
+    else { alert('保存に失敗しました：' + (res.error || 'unknown')); }
+  };
 }
 
 // CSV生成＆ダウンロード（Excelの文字化け回避にUTF-8 BOMを付与）

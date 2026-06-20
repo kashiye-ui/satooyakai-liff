@@ -152,6 +152,31 @@ input[type="text"], input[type="tel"], input[type="number"], input:not([type]), 
   font-size: 0.85rem;
 }
 
+/* トグル用の小さなボタン（支払・会費・公開状態など） */
+.chip {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  font-size: 0.85rem;
+  cursor: pointer;
+  line-height: 1.4;
+}
+.chip.on {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.chip.off {
+  background: #fbe9e7;
+  border-color: #ffab91;
+  color: #c62828;
+}
+.chip:disabled { opacity: 0.5; cursor: not-allowed; }
+.actions .chip { flex: 0 0 auto; }
+
 .tbl-wrap { overflow-x: auto; }
 table.tbl {
   border-collapse: collapse;
