@@ -204,11 +204,20 @@ function renderHome(data) {
         <span>しおり・会報・総会資料・Q&amp;A</span>
       </button>
 
+      ${data.isAdmin ? `
+      <button class="card-btn" id="nav-admin">
+        <strong>管理メニュー</strong>
+        <span>運営・理事用（会員名簿・行事・会費・資料）</span>
+      </button>` : ''}
+
       <p class="muted">ご家族も、それぞれのLINEから「家族として参加」でご登録いただけます。</p>
     </section>
   `;
   document.getElementById('nav-events').onclick = renderEvents;
   document.getElementById('nav-docs').onclick = renderDocs;
+  if (data.isAdmin) {
+    document.getElementById('nav-admin').onclick = renderAdmin;
+  }
 }
 
 // ===== 画面: イベント一覧 =====
