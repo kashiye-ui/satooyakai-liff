@@ -844,7 +844,7 @@ async function renderAdmin() {
 function renderAdminHome() {
   $app.innerHTML = `
     <section class="screen">
-      <h1>管理メニュー</h1>
+      <h1>さいたま市里親会 管理メニュー</h1>
       <button class="card-btn" id="a-events"><strong>行事の参加者管理</strong><span>申込状況・参加費の回収・代理入力・CSV出力</span></button>
       <button class="card-btn" id="a-members"><strong>会員名簿</strong><span>世帯・個人の一覧・LINEなし世帯の代理登録・CSV出力</span></button>
       <button class="card-btn" id="a-fees"><strong>会費の管理</strong><span>年会費の納付状況・未納一覧</span></button>
