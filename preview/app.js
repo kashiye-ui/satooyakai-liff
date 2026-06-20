@@ -148,9 +148,84 @@ function renderHome(data) {
 }
 
 // ===== 画面: イベント一覧 =====
+// 多段階料金（区分ごとの料金表）を持つ行事か
+function isMultiTier(ev) { return !!(ev && ev.feeSchedule && Array.isArray(ev.feeSchedule.tiers)); }
+
 function feeText(e) {
+  if (isMultiTier(e)) return '参加費：区分・人数によって異なります';
   if (e.adultFee === 0 && e.childFee === 0) return '参加費：無料';
   return `参加費：大人 ${e.adultFee.toLocaleString()}円 / 子ども ${e.childFee.toLocaleString()}円`;
+}
+
+// 出欠フォームの人数入力欄（多段階 or 2区分）の本文HTMLを返す
+function feeFormBody(ev, cur) {
+  cur = cur || {};
+  if (isMultiTier(ev)) {
+    const fs = ev.feeSchedule;
+    const counts = (cur.breakdown && cur.breakdown.counts) || {};
+    const isFHB = cur.breakdown ? !!cur.breakdown.isFHB : false;
+    const fhbBlock = fs.fhb ? `
+      <label class="check"><input type="checkbox" id="fhb" ${isFHB ? 'checked' : ''}> ${escapeHtml(fs.fhbLabel || 'ファミリーホーム')}（料金が変わります）</label>` : '';
+    const tierInputs = fs.tiers.map(t => `
+      <label>${escapeHtml(t.label)} の人数</label>
+      <input class="tier-input" data-key="${escapeAttr(t.key)}" type="number" inputmode="numeric" min="0" value="${counts[t.key] != null ? counts[t.key] : 0}">`).join('');
+    return `
+      ${fhbBlock}
+      ${tierInputs}
+      <p class="hint">参加されない区分は 0 のままにしてください。措置児は無料です。</p>
+      <div class="card"><p><strong>参加費合計：<span id="fee-total">0</span>円</strong></p></div>`;
+  }
+  return `
+    <label>参加する大人の人数 <span class="req">*</span></label>
+    <input id="adult" type="number" inputmode="numeric" min="0" value="${cur.adultCount != null ? cur.adultCount : 1}">
+    <label>参加する子どもの人数 <span class="req">*</span></label>
+    <input id="child" type="number" inputmode="numeric" min="0" value="${cur.childCount != null ? cur.childCount : 0}">`;
+}
+
+// 多段階の現在値（合計・区分人数・FHB）を画面から読む
+function computeMultiTier(ev) {
+  const fs = ev.feeSchedule;
+  const isFHB = document.getElementById('fhb') ? document.getElementById('fhb').checked : false;
+  let total = 0; const counts = {};
+  document.querySelectorAll('.tier-input').forEach(inp => {
+    const key = inp.dataset.key;
+    const n = parseInt(inp.value, 10) || 0;
+    counts[key] = n;
+    const t = fs.tiers.find(x => x.key === key);
+    const price = (isFHB && fs.fhb && t && t.feeB != null) ? t.feeB : (t ? t.fee : 0);
+    total += n * (Number(price) || 0);
+  });
+  return { total, counts, isFHB };
+}
+
+// 合計の即時表示を配線する
+function wireFeeInputs(ev) {
+  if (!isMultiTier(ev)) return;
+  const update = () => {
+    const el = document.getElementById('fee-total');
+    if (el) el.textContent = computeMultiTier(ev).total.toLocaleString();
+  };
+  document.querySelectorAll('.tier-input').forEach(i => { i.oninput = update; });
+  const fhb = document.getElementById('fhb');
+  if (fhb) fhb.onchange = update;
+  update();
+}
+
+// 出欠フォームの入力を送信用 payload に変換（不正なら null＋alert）
+function readAttendancePayload(ev) {
+  const notes = (document.getElementById('notes').value || '').trim();
+  if (isMultiTier(ev)) {
+    const { counts, isFHB } = computeMultiTier(ev);
+    const sum = Object.keys(counts).reduce((a, k) => a + (counts[k] || 0), 0);
+    if (sum <= 0) { alert('参加する人数を入力してください（欠席の場合はこの行事は申込不要です）。'); return null; }
+    return { eventId: ev.eventId, breakdown: { isFHB, counts }, notes };
+  }
+  const adultCount = parseInt(document.getElementById('adult').value, 10);
+  const childCount = parseInt(document.getElementById('child').value, 10);
+  if (isNaN(adultCount) || isNaN(childCount) || adultCount < 0 || childCount < 0) {
+    alert('参加人数を正しく入力してください。'); return null;
+  }
+  return { eventId: ev.eventId, adultCount, childCount, notes };
 }
 
 async function renderEvents() {
@@ -167,7 +242,7 @@ async function renderEvents() {
       <p><strong>${escapeHtml(e.name)}</strong></p>
       <p class="muted">${escapeHtml(e.date)}${e.place ? ' ／ ' + escapeHtml(e.place) : ''}</p>
       <p class="muted">${feeText(e)}${e.deadline ? ' ／ 申込締切 ' + escapeHtml(e.deadline) : ''}</p>
-      ${e.myResponse ? `<p>✓ 回答済み：大人 ${e.myResponse.adultCount}名・子ども ${e.myResponse.childCount}名</p>` : ''}
+      ${e.myResponse ? `<p>✓ 回答済み：大人 ${e.myResponse.adultCount}名・子ども ${e.myResponse.childCount}名${e.myResponse.total > 0 ? '（参加費 ' + e.myResponse.total.toLocaleString() + '円）' : ''}</p>` : ''}
       <button class="btn primary act" data-id="${escapeAttr(e.eventId)}">${e.myResponse ? '回答を変更する' : '出欠を回答する'}</button>
     </div>`;
 
@@ -208,15 +283,10 @@ function renderAttendanceForm(ev) {
         <p class="muted">${feeText(ev)}</p>
       </div>
 
-      <label>参加する大人の人数 <span class="req">*</span></label>
-      <input id="adult" type="number" inputmode="numeric" min="0" value="${r.adultCount != null ? r.adultCount : 1}">
-
-      <label>参加する子どもの人数 <span class="req">*</span></label>
-      <input id="child" type="number" inputmode="numeric" min="0" value="${r.childCount != null ? r.childCount : 0}">
+      ${feeFormBody(ev, r)}
 
       <label>特記事項（アレルギー等・任意）</label>
       <input id="notes" type="text" value="${escapeAttr(r.notes)}">
-      <p class="hint">欠席される場合は、大人・子どもとも 0 にしてください。</p>
 
       <div class="actions">
         <button class="btn" id="back-btn">戻る</button>
@@ -225,17 +295,11 @@ function renderAttendanceForm(ev) {
     </section>
   `;
   document.getElementById('back-btn').onclick = renderEvents;
+  wireFeeInputs(ev);
   document.getElementById('submit-btn').onclick = async () => {
-    const adultCount = parseInt(document.getElementById('adult').value, 10);
-    const childCount = parseInt(document.getElementById('child').value, 10);
-    const notes = document.getElementById('notes').value.trim();
-    if (isNaN(adultCount) || isNaN(childCount) || adultCount < 0 || childCount < 0) {
-      alert('参加人数を正しく入力してください。');
-      return;
-    }
-    const res = await callApi('submitAttendance', {
-      eventId: ev.eventId, adultCount, childCount, notes,
-    });
+    const payload = readAttendancePayload(ev);
+    if (!payload) return;
+    const res = await callApi('submitAttendance', payload);
     if (res.ok) {
       renderAttendanceDone(ev, res);
     } else {
@@ -790,7 +854,7 @@ function drawAdminRoster() {
     </section>
   `;
   document.getElementById('back-btn').onclick = renderAdminEvents;
-  document.getElementById('proxy-btn').onclick = () => renderProxyHouseholdPicker(eventId, event.name);
+  document.getElementById('proxy-btn').onclick = () => renderProxyHouseholdPicker(eventId, event);
 
   document.querySelectorAll('button.pay-toggle').forEach(b => {
     b.onclick = async () => {
@@ -805,23 +869,37 @@ function drawAdminRoster() {
   document.querySelectorAll('button.edit-att').forEach(b => {
     b.onclick = () => {
       const r = rows[+b.dataset.i];
-      renderProxyAttendanceForm(eventId, event.name, { householdId: r.householdId, label: `${r.ku} ${r.representativeName}` },
-        { adultCount: r.adultCount, childCount: r.childCount, notes: r.notes });
+      renderProxyAttendanceForm(eventId, event, { householdId: r.householdId, label: `${r.ku} ${r.representativeName}` },
+        { adultCount: r.adultCount, childCount: r.childCount, notes: r.notes, breakdown: r.breakdown });
     };
   });
 
   const csvBtn = document.getElementById('csv-btn');
   if (csvBtn) {
     csvBtn.onclick = () => {
-      const header = ['区', '世帯代表者', '世帯ID', '大人', '子ども', '参加費合計', '支払状況', '特記事項', '回答日時'];
-      const data = rows.map(r => [r.ku, r.representativeName, r.householdId, r.adultCount, r.childCount, r.total, r.payStatus, r.notes, r.answeredAt]);
+      const fs = event.feeSchedule;
+      const header = ['区', '世帯代表者', '世帯ID', '大人', '子ども', '参加費合計', '支払状況', '内訳', '特記事項', '回答日時'];
+      const data = rows.map(r => [r.ku, r.representativeName, r.householdId, r.adultCount, r.childCount, r.total, r.payStatus, breakdownText(r.breakdown, fs), r.notes, r.answeredAt]);
       downloadCsv(`roster_${eventId}.csv`, [header].concat(data));
     };
   }
 }
 
+// 内訳JSON を人が読める文字列にする（例: "FH / 大人・高校生2,小学生1"）
+function breakdownText(breakdown, feeSchedule) {
+  if (!breakdown || !breakdown.counts) return '';
+  const labels = {};
+  if (feeSchedule && Array.isArray(feeSchedule.tiers)) {
+    feeSchedule.tiers.forEach(t => { labels[t.key] = t.label; });
+  }
+  const parts = Object.keys(breakdown.counts)
+    .filter(k => breakdown.counts[k] > 0)
+    .map(k => `${labels[k] || k}${breakdown.counts[k]}`);
+  return (breakdown.isFHB ? 'FH / ' : '') + parts.join('，');
+}
+
 // 代理入力：世帯を選ぶ → 出欠フォーム
-async function renderProxyHouseholdPicker(eventId, eventName) {
+async function renderProxyHouseholdPicker(eventId, event) {
   $app.innerHTML = `<section class="screen"><h1>代理入力</h1><p>世帯を読み込み中...</p></section>`;
   const res = await callApi('adminListHouseholds', {});
   if (!res.ok) return renderActionError('代理入力', res.error);
@@ -834,7 +912,7 @@ async function renderProxyHouseholdPicker(eventId, eventName) {
   $app.innerHTML = `
     <section class="screen">
       <h1>代理入力する世帯</h1>
-      <p class="muted">${escapeHtml(eventName)}</p>
+      <p class="muted">${escapeHtml(event.name)}</p>
       <p class="hint">LINEで回答できない世帯の出欠を、運営が代わりに入力します。締切後でも入力できます。</p>
       ${hs.length ? cards : '<p class="muted">世帯がありません。</p>'}
       <button class="btn" id="back-btn" style="margin-top:16px;">参加者一覧へ戻る</button>
@@ -842,27 +920,30 @@ async function renderProxyHouseholdPicker(eventId, eventName) {
   `;
   document.getElementById('back-btn').onclick = () => renderAdminRoster(eventId);
   document.querySelectorAll('button.pick-h').forEach(b => {
-    b.onclick = () => renderProxyAttendanceForm(eventId, eventName,
+    b.onclick = () => renderProxyAttendanceForm(eventId, event,
       { householdId: b.dataset.id, label: b.dataset.label }, {});
   });
 }
 
-function renderProxyAttendanceForm(eventId, eventName, hh, cur) {
+function renderProxyAttendanceForm(eventId, event, hh, cur) {
   cur = cur || {};
+  // 料金計算用の ev（多段階/2区分の両対応）
+  const ev = {
+    eventId: eventId, name: event.name,
+    feeSchedule: event.feeSchedule || null,
+    adultFee: event.adultFee || 0, childFee: event.childFee || 0,
+  };
   $app.innerHTML = `
     <section class="screen">
       <h1>代理で出欠を入力</h1>
       <div class="card">
-        <p><strong>${escapeHtml(eventName)}</strong></p>
+        <p><strong>${escapeHtml(event.name)}</strong></p>
         <p class="muted">${escapeHtml(hh.label)}</p>
       </div>
-      <label>参加する大人の人数 <span class="req">*</span></label>
-      <input id="adult" type="number" inputmode="numeric" min="0" value="${cur.adultCount != null ? cur.adultCount : 1}">
-      <label>参加する子どもの人数 <span class="req">*</span></label>
-      <input id="child" type="number" inputmode="numeric" min="0" value="${cur.childCount != null ? cur.childCount : 0}">
+      ${feeFormBody(ev, cur)}
       <label>特記事項（任意）</label>
       <input id="notes" type="text" value="${escapeAttr(cur.notes)}">
-      <p class="hint">欠席の場合は大人・子どもとも 0 にしてください。支払状況は名簿側で管理します。</p>
+      <p class="hint">支払状況は名簿側で管理します。</p>
       <div class="actions">
         <button class="btn" id="back-btn">戻る</button>
         <button class="btn primary" id="submit-btn">この内容で登録</button>
@@ -870,17 +951,12 @@ function renderProxyAttendanceForm(eventId, eventName, hh, cur) {
     </section>
   `;
   document.getElementById('back-btn').onclick = () => renderAdminRoster(eventId);
+  wireFeeInputs(ev);
   document.getElementById('submit-btn').onclick = async () => {
-    const adultCount = parseInt(document.getElementById('adult').value, 10);
-    const childCount = parseInt(document.getElementById('child').value, 10);
-    const notes = document.getElementById('notes').value.trim();
-    if (isNaN(adultCount) || isNaN(childCount) || adultCount < 0 || childCount < 0) {
-      alert('参加人数を正しく入力してください。');
-      return;
-    }
-    const res = await callApi('adminSubmitAttendance', {
-      eventId, householdId: hh.householdId, adultCount, childCount, notes,
-    });
+    const payload = readAttendancePayload(ev);
+    if (!payload) return;
+    payload.householdId = hh.householdId;
+    const res = await callApi('adminSubmitAttendance', payload);
     if (res.ok) { renderAdminRoster(eventId); }
     else { alert('登録に失敗しました：' + (res.error || 'unknown')); }
   };
