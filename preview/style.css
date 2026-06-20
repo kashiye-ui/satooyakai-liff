@@ -255,11 +255,17 @@ input[type="text"], input[type="tel"], input[type="number"], input:not([type]), 
 table.tbl th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
 table.tbl th.sortable:hover { background: #e8e0d2; }
 
-.tbl-wrap { overflow-x: auto; }
+.tbl-wrap {
+  overflow-x: auto;
+  background: #fff;               /* 背景の絵柄を透けさせず、表内のテキストを読みやすく */
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
 table.tbl {
   border-collapse: collapse;
   width: 100%;
   font-size: 0.85rem;
+  background: #fff;
 }
 table.tbl th, table.tbl td {
   border: 1px solid var(--border);
