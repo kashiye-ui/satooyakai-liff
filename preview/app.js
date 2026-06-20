@@ -967,12 +967,25 @@ async function renderAdminHouseholds() {
   const res = await callApi('adminListHouseholds', {});
   if (!res.ok) return renderActionError('会員名簿', res.error);
   const hs = res.households || [];
+  const memberLine = (m) => {
+    const isLine = m.lineUserId && String(m.lineUserId).indexOf('U') === 0;
+    let ctl = '';
+    if (m.isFixedAdmin) {
+      ctl = '<span class="chip on" style="pointer-events:none;">管理者(固定)</span>';
+    } else if (isLine) {
+      ctl = `<button class="chip ${m.isAdmin ? 'on' : ''} admin-toggle" data-uid="${escapeAttr(m.lineUserId)}" data-on="${m.isAdmin ? '1' : '0'}" data-name="${escapeAttr(m.name)}">${m.isAdmin ? '管理者' : '管理者にする'}</button>`;
+    } else {
+      ctl = '<span class="muted">（LINEなし）</span>';
+    }
+    const st = m.status !== '有効' ? '<span class="muted">[' + escapeHtml(m.status) + ']</span>' : '';
+    return `<p>・${escapeHtml(m.name)}（${escapeHtml(m.role)}）${st} ${ctl}</p>`;
+  };
   const card = (h, i) => `
     <div class="card">
       <p><strong>${escapeHtml(h.ku)} ${escapeHtml(h.representativeName)}</strong>
          <span class="muted">${escapeHtml(h.householdId)}${h.fosterType ? '・' + escapeHtml(h.fosterType) : ''}</span></p>
       <p class="muted">${escapeHtml(h.phone || '')}${h.feeStatus ? ' ／ 会費:' + escapeHtml(h.feeStatus) : ''}</p>
-      ${h.members.map(m => `<p>・${escapeHtml(m.name)}（${escapeHtml(m.role)}）${m.status !== '有効' ? '<span class="muted">[' + escapeHtml(m.status) + ']</span>' : ''}</p>`).join('')}
+      ${h.members.map(memberLine).join('')}
       <button class="chip add-member" data-i="${i}" style="margin-top:6px;">＋ 家族を追加（LINEなし）</button>
     </div>`;
   $app.innerHTML = `
@@ -991,6 +1004,20 @@ async function renderAdminHouseholds() {
     b.onclick = () => {
       const h = hs[+b.dataset.i];
       renderProxyAddMember({ householdId: h.householdId, label: `${h.ku} ${h.representativeName}` });
+    };
+  });
+  document.querySelectorAll('button.admin-toggle').forEach(b => {
+    b.onclick = async () => {
+      const isOn = b.dataset.on === '1';
+      const make = !isOn;
+      const msg = make
+        ? `${b.dataset.name} さんに管理者権限を付与します。\n会員名簿・電話番号・CSVなど、すべての会員情報を閲覧できるようになります。よろしいですか？`
+        : `${b.dataset.name} さんの管理者権限を解除します。よろしいですか？`;
+      if (!confirm(msg)) return;
+      b.disabled = true;
+      const resp = await callApi('adminSetAdmin', { targetUserId: b.dataset.uid, makeAdmin: make });
+      if (resp.ok) { renderAdminHouseholds(); }
+      else { alert('変更に失敗しました：' + (resp.error || 'unknown')); b.disabled = false; }
     };
   });
   const csvBtn = document.getElementById('csv-btn');
