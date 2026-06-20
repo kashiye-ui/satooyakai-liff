@@ -175,7 +175,7 @@ input[type="text"], input[type="tel"], input[type="number"], input:not([type]), 
 .card-btn:nth-of-type(4n+4) { background: var(--lavender-soft); border-left-color: var(--lavender); }
 
 .links { padding-left: 1.2em; }
-.links a { color: #1976d2; }
+.links a { color: #5d4037; }
 
 .mono {
   font-family: ui-monospace, "SF Mono", Consolas, monospace;
