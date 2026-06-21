@@ -131,6 +131,13 @@ input[type="text"], input[type="tel"], input[type="number"], input:not([type]), 
 }
 .btn.primary:hover { background: var(--primary-dark); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+/* 「戻る」系ボタンはグレーで統一（上部バーと同じ「‹ ○○」表記） */
+.btn.back {
+  background: #ece7de;
+  color: #6b6258;
+  border-color: #d9d1c3;
+}
+.btn.back:hover { background: #e3ddd2; }
 
 .actions {
   display: flex;
@@ -208,9 +215,9 @@ a, a:link, a:visited {
 }
 .topbar .back-link {
   flex: 0 0 auto;
-  border: 1px solid var(--border);
-  background: #fff;
-  color: var(--text);
+  border: 1px solid #d9d1c3;
+  background: #ece7de;
+  color: #6b6258;
   border-radius: 8px;
   padding: 6px 12px;
   font-size: 0.95rem;

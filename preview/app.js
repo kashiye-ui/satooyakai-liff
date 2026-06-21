@@ -357,7 +357,7 @@ async function renderEvents() {
       <h2 class="sub">受付中の行事</h2>
       ${open.length ? open.map(openCard).join('') : '<p class="muted">現在、受付中の行事はありません。</p>'}
       ${past.length ? `<h2 class="sub">過去の行事</h2>${past.map(pastCard).join('')}` : ''}
-      <button class="btn" id="home-btn" style="margin-top:24px;">マイページへ戻る</button>
+      <button class="btn back" id="home-btn" style="margin-top:24px;">‹ マイページ</button>
     </section>
   `;
   document.getElementById('topback').onclick = goHome;
@@ -388,7 +388,7 @@ function renderAttendanceForm(ev) {
       <input id="notes" type="text" value="${escapeAttr(r.notes)}">
 
       <div class="actions">
-        <button class="btn" id="back-btn">戻る</button>
+        <button class="btn back" id="back-btn">‹ 戻る</button>
         <button class="btn primary" id="submit-btn">この内容で回答</button>
       </div>
     </section>
@@ -450,7 +450,7 @@ async function renderDocs() {
       ${topBar('お役立ち資料', 'マイページ')}
       <h1>お役立ち資料</h1>
       ${body}
-      <button class="btn" id="home-btn" style="margin-top:24px;">マイページへ戻る</button>
+      <button class="btn back" id="home-btn" style="margin-top:24px;">‹ マイページ</button>
     </section>
   `;
   document.getElementById('topback').onclick = goHome;
@@ -471,7 +471,7 @@ function renderActionError(title, err) {
         <p>読み込みに失敗しました。</p>
         <p class="muted">${escapeHtml(err || '')}</p>
       </div>
-      <button class="btn" id="home-btn">マイページへ戻る</button>
+      <button class="btn back" id="home-btn">‹ マイページ</button>
     </section>
   `;
   document.getElementById('home-btn').onclick = goHome;
@@ -571,7 +571,7 @@ function renderNewHouseholdForm() {
       </div>
 
       <div class="actions">
-        <button class="btn" id="back-btn">戻る</button>
+        <button class="btn back" id="back-btn">‹ 戻る</button>
         <button class="btn primary" id="next-btn">次へ</button>
       </div>
     </section>
@@ -606,7 +606,7 @@ function renderNewMemberForm() {
         <p><strong>里親種別:</strong> ${escapeHtml(h.fosterType)}</p>
       </div>
       <div class="actions">
-        <button class="btn" id="back-btn">戻る</button>
+        <button class="btn back" id="back-btn">‹ 戻る</button>
         <button class="btn primary" id="submit-btn">この内容で登録</button>
       </div>
     </section>
@@ -683,7 +683,7 @@ function renderSearchHouseholdForm() {
       </div>
 
       <div class="actions">
-        <button class="btn" id="back-btn">戻る</button>
+        <button class="btn back" id="back-btn">‹ 戻る</button>
         <button class="btn primary" id="search-btn">検索</button>
       </div>
     </section>
@@ -735,7 +735,7 @@ function renderJoinConfirm() {
       </div>
       <p>この世帯のご家族として登録します。</p>
       <div class="actions">
-        <button class="btn" id="back-btn">戻る</button>
+        <button class="btn back" id="back-btn">‹ 戻る</button>
         <button class="btn primary" id="next-btn">次へ</button>
       </div>
     </section>
@@ -768,7 +768,7 @@ function renderJoinMemberForm() {
       </div>
 
       <div class="actions">
-        <button class="btn" id="back-btn">戻る</button>
+        <button class="btn back" id="back-btn">‹ 戻る</button>
         <button class="btn primary" id="submit-btn">登録</button>
       </div>
     </section>
@@ -901,7 +901,7 @@ async function renderAdmin() {
           <p class="muted">権限が必要な場合は、次のIDを管理者にお伝えください。</p>
           <p class="mono">${escapeHtml(res.userId || '')}</p>
         </div>
-        <button class="btn" id="home-btn">マイページへ戻る</button>
+        <button class="btn back" id="home-btn">‹ マイページ</button>
       </section>`;
     document.getElementById('home-btn').onclick = goHome;
     return;
@@ -917,7 +917,7 @@ function renderAdminHome() {
       <button class="card-btn" id="a-members"><strong>会員名簿</strong><span>世帯・個人の一覧・LINEなし世帯の代理登録・CSV出力</span></button>
       <button class="card-btn" id="a-fees"><strong>会費の管理</strong><span>年会費の納付状況・未納一覧</span></button>
       <button class="card-btn" id="a-materials"><strong>資料の管理</strong><span>会報・しおり等の追加・公開/非公開</span></button>
-      <button class="btn" id="home-btn" style="margin-top:24px;">マイページへ戻る</button>
+      <button class="btn back" id="home-btn" style="margin-top:24px;">‹ マイページ</button>
     </section>
   `;
   document.getElementById('a-events').onclick = renderAdminEvents;
@@ -949,7 +949,7 @@ async function renderAdminEvents() {
       <h1>行事の参加者管理</h1>
       <button class="btn" id="new-ev-btn">＋ 行事を新規作成</button>
       ${evs.length ? evs.map(card).join('') : '<p class="muted">行事がありません。</p>'}
-      <button class="btn" id="back-btn" style="margin-top:24px;">管理メニューへ</button>
+      <button class="btn back" id="back-btn" style="margin-top:24px;">‹ 管理メニュー</button>
     </section>
   `;
   document.getElementById('topback').onclick = renderAdminHome;
@@ -997,7 +997,7 @@ function renderEventForm(ev) {
       <label>備考</label>
       <input id="ev-note" value="${escapeAttr(c.note)}">
       <div class="actions">
-        <button class="btn" id="back-btn">戻る</button>
+        <button class="btn back" id="back-btn">‹ 戻る</button>
         <button class="btn primary" id="submit-btn">保存</button>
       </div>
     </section>
@@ -1090,7 +1090,7 @@ function drawAdminRoster() {
         <p class="hint">ダウンロードはPCのブラウザ推奨です。</p>
       ` : '<p class="muted">該当する回答がありません。</p>'}
       <button class="btn" id="proxy-btn" style="margin-top:8px;">LINEなし世帯を代理で入力</button>
-      <button class="btn" id="back-btn" style="margin-top:8px;">行事一覧へ</button>
+      <button class="btn back" id="back-btn" style="margin-top:8px;">‹ 行事一覧</button>
     </section>
   `;
   document.getElementById('topback').onclick = renderAdminEvents;
@@ -1158,7 +1158,7 @@ async function renderProxyHouseholdPicker(eventId, event) {
       <p class="muted">${escapeHtml(event.name)}</p>
       <p class="hint">LINEで回答できない世帯の出欠を、運営が代わりに入力します。締切後でも入力できます。</p>
       ${hs.length ? cards : '<p class="muted">世帯がありません。</p>'}
-      <button class="btn" id="back-btn" style="margin-top:16px;">参加者一覧へ戻る</button>
+      <button class="btn back" id="back-btn" style="margin-top:16px;">‹ 参加者一覧</button>
     </section>
   `;
   document.getElementById('topback').onclick = () => renderAdminRoster(eventId);
@@ -1189,7 +1189,7 @@ function renderProxyAttendanceForm(eventId, event, hh, cur) {
       <input id="notes" type="text" value="${escapeAttr(cur.notes)}">
       <p class="hint">支払状況は名簿側で管理します。</p>
       <div class="actions">
-        <button class="btn" id="back-btn">戻る</button>
+        <button class="btn back" id="back-btn">‹ 戻る</button>
         <button class="btn primary" id="submit-btn">この内容で登録</button>
       </div>
     </section>
@@ -1278,7 +1278,7 @@ function drawAdminMembers() {
         <button class="btn primary" id="csv-btn" style="margin-top:8px;">CSVをダウンロード（個人単位・全件）</button>
         <p class="hint">見出しをクリックで並べ替え。検索ボックスで絞り込み。PC推奨・表は横スクロール可。</p>
       ` : '<p class="muted">該当する会員がいません。</p>'}
-      <button class="btn" id="back-btn" style="margin-top:8px;">管理メニューへ</button>
+      <button class="btn back" id="back-btn" style="margin-top:8px;">‹ 管理メニュー</button>
     </section>
   `;
   document.getElementById('topback').onclick = renderAdminHome;
@@ -1353,7 +1353,7 @@ function renderProxyNewHousehold() {
         ${FOSTER_TYPES.map(f => `<label class="radio"><input type="radio" name="fosterType" value="${f}"> ${f}</label>`).join('')}
       </div>
       <div class="actions">
-        <button class="btn" id="back-btn">戻る</button>
+        <button class="btn back" id="back-btn">‹ 戻る</button>
         <button class="btn primary" id="submit-btn">登録</button>
       </div>
     </section>
@@ -1398,7 +1398,7 @@ function renderProxyAddMember(hh) {
         <input id="firstName" placeholder="名">
       </div>
       <div class="actions">
-        <button class="btn" id="back-btn">戻る</button>
+        <button class="btn back" id="back-btn">‹ 戻る</button>
         <button class="btn primary" id="submit-btn">追加</button>
       </div>
     </section>
@@ -1470,7 +1470,7 @@ function drawAdminFees() {
         </table></div>` : '<p class="muted">該当する世帯はありません。</p>'}
       <button class="btn primary" id="csv-btn" style="margin-top:8px;">未納一覧をCSVで出力</button>
       <p class="hint">見出しクリックで並べ替え。「納付済 / 未納」はタップで切替（${fiscalYear}年度分）。PC推奨・横スクロール可。</p>
-      <button class="btn" id="back-btn" style="margin-top:8px;">管理メニューへ</button>
+      <button class="btn back" id="back-btn" style="margin-top:8px;">‹ 管理メニュー</button>
     </section>
   `;
   document.getElementById('topback').onclick = renderAdminHome;
@@ -1525,7 +1525,7 @@ function drawAdminMaterials() {
       <p class="hint">PDFはGoogleドライブ等の共有URLを登録します（このアプリにファイルは保存しません）。共有設定は「リンクを知っている全員が閲覧可」にしてください。</p>
       <button class="btn" id="new-btn">＋ 資料を追加</button>
       ${mats.length ? mats.map(card).join('') : '<p class="muted">資料がありません。</p>'}
-      <button class="btn" id="back-btn" style="margin-top:8px;">管理メニューへ</button>
+      <button class="btn back" id="back-btn" style="margin-top:8px;">‹ 管理メニュー</button>
     </section>
   `;
   document.getElementById('topback').onclick = renderAdminHome;
@@ -1564,7 +1564,7 @@ function renderMaterialForm(m) {
       <p class="hint">資料はすべて会員限定です（登録会員のみ閲覧できます）。</p>
       <label class="check"><input type="checkbox" id="m-pub" ${cur.status !== '非公開' ? 'checked' : ''}> 公開する（オフで非公開＝会員にも表示されません）</label>
       <div class="actions">
-        <button class="btn" id="back-btn">戻る</button>
+        <button class="btn back" id="back-btn">‹ 戻る</button>
         <button class="btn primary" id="submit-btn">保存</button>
       </div>
     </section>
