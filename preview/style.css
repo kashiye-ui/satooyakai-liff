@@ -172,9 +172,14 @@ input[type="text"], input[type="tel"], input[type="number"], input:not([type]), 
 /* 各ボタンで淡い色を順に変えて華やかに */
 .card-btn:nth-of-type(4n+1) { background: var(--green-soft);    border-left-color: var(--green); }
 .card-btn:nth-of-type(4n+2) { background: var(--pink-soft);     border-left-color: var(--pink); }
-.card-btn:nth-of-type(4n+3) { background: var(--blue-soft);     border-left-color: var(--blue); }
+.card-btn:nth-of-type(4n+3) { background: var(--yellow-soft);   border-left-color: var(--yellow); }
 .card-btn:nth-of-type(4n+4) { background: var(--lavender-soft); border-left-color: var(--lavender); }
 
+/* すべてのリンク（自動リンク化された電話番号・URLを含む）をこげ茶に。青文字を出さない。 */
+a, a:link, a:visited {
+  color: var(--brown) !important;
+  -webkit-text-fill-color: var(--brown);
+}
 .links { padding-left: 1.2em; }
 .links a { color: var(--brown); }
 
