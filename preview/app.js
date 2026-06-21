@@ -909,20 +909,27 @@ async function renderAdmin() {
     document.getElementById('home-btn').onclick = goHome;
     return;
   }
-  renderAdminHome();
+  return renderAdminHome();
 }
 
-function renderAdminHome() {
+async function renderAdminHome() {
+  // 承認待ち件数（バッジ用）。取得失敗時は0扱い。
+  let pending = 0;
+  try { const r = await callApi('adminPendingCount', {}); if (r.ok) pending = r.count || 0; } catch (e) { /* noop */ }
+  const badge = pending ? ` <span class="badge">承認待ち ${pending}</span>` : '';
   $app.innerHTML = `
     <section class="screen">
       <h1>さいたま市里親会 管理メニュー</h1>
+      ${pending ? `<button class="card-btn alert-btn" id="a-pending"><strong>⚠ 承認待ちが ${pending}件あります</strong><span>タップして会員名簿で承認/却下</span></button>` : ''}
       <button class="card-btn" id="a-events"><strong>行事の参加者管理</strong><span>申込状況・参加費の回収・代理入力・CSV出力</span></button>
-      <button class="card-btn" id="a-members"><strong>会員名簿</strong><span>世帯・個人の一覧・LINEなし世帯の代理登録・CSV出力</span></button>
+      <button class="card-btn" id="a-members"><strong>会員名簿${badge}</strong><span>世帯・個人の一覧・承認・LINEなし世帯の代理登録・CSV</span></button>
       <button class="card-btn" id="a-fees"><strong>会費の管理</strong><span>年会費の納付状況・未納一覧</span></button>
       <button class="card-btn" id="a-materials"><strong>資料の管理</strong><span>会報・しおり等の追加・公開/非公開</span></button>
       <button class="btn back" id="home-btn" style="margin-top:24px;">‹ マイページ</button>
     </section>
   `;
+  const pb = document.getElementById('a-pending');
+  if (pb) pb.onclick = renderAdminHouseholds;
   document.getElementById('a-events').onclick = renderAdminEvents;
   document.getElementById('a-members').onclick = renderAdminHouseholds;
   document.getElementById('a-fees').onclick = renderAdminFees;

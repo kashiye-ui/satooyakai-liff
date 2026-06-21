@@ -181,6 +181,21 @@ input[type="text"], input[type="tel"], input[type="number"], input:not([type]), 
 .card-btn:nth-of-type(4n+2) { background: var(--pink-soft);     border-left-color: var(--pink); }
 .card-btn:nth-of-type(4n+3) { background: var(--yellow-soft);   border-left-color: var(--yellow); }
 .card-btn:nth-of-type(4n+4) { background: var(--lavender-soft); border-left-color: var(--lavender); }
+/* 承認待ちの注意カード（順番色より優先） */
+.card-btn.alert-btn { background: var(--pink-soft); border-left-color: var(--pink); }
+
+/* 件数バッジ（承認待ちなど） */
+.badge {
+  display: inline-block;
+  background: var(--pink);
+  color: #fff;
+  -webkit-text-fill-color: #fff;
+  font-size: 0.75rem;
+  border-radius: 999px;
+  padding: 1px 8px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
 
 /* すべてのリンク（自動リンク化された電話番号・URLを含む）をこげ茶に。青文字を出さない。 */
 a, a:link, a:visited {
