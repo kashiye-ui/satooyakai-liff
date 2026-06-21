@@ -438,7 +438,7 @@ async function renderDocs() {
     body = Object.keys(groups).map(cat => `
       <h2 class="sub">${escapeHtml(cat)}</h2>
       ${groups[cat].map(m => `
-        <button class="card-btn doc-link" data-url="${escapeAttr(m.url)}">
+        <button class="card-btn doc-link" data-id="${escapeAttr(m.id)}">
           <strong>${escapeHtml(m.title)}</strong>
           <span>${escapeHtml(m.publishedAt || '')}</span>
         </button>`).join('')}
@@ -456,8 +456,11 @@ async function renderDocs() {
   document.getElementById('topback').onclick = goHome;
   document.getElementById('home-btn').onclick = goHome;
   document.querySelectorAll('button.doc-link').forEach(b => {
-    b.onclick = () => {
-      if (b.dataset.url) openUrl(b.dataset.url, true);
+    b.onclick = async () => {
+      // 承認会員にだけ、開けるURL（R2は署名付き）を発行してから開く
+      const res = await callApi('materialUrl', { id: b.dataset.id });
+      if (res.ok && res.url) { openUrl(res.url, true); }
+      else { alert('資料を開けませんでした：' + (res.error || 'unknown')); }
     };
   });
 }
@@ -1511,8 +1514,8 @@ function drawAdminMaterials() {
   const card = (m, i) => `
     <div class="card${m.status === '非公開' ? ' warn' : ''}">
       <p><strong>${escapeHtml(m.title)}</strong>
-         <span class="muted">${escapeHtml(m.category)}</span></p>
-      <p class="muted" style="word-break:break-all;">${escapeHtml(m.url)}</p>
+         <span class="muted">${escapeHtml(m.category)}${m.isFile ? '・📎アップロード' : '・リンク'}</span></p>
+      <p class="muted" style="word-break:break-all;">${m.isFile ? '（Cloudflareに保管・認証配信）' : escapeHtml(m.url)}</p>
       <div class="actions" style="margin-top:6px;">
         <button class="chip ${m.status === '公開' ? 'on' : 'off'} mat-toggle" data-i="${i}">${escapeHtml(m.status)}</button>
         <button class="chip mat-edit" data-i="${i}">編集</button>
@@ -1522,7 +1525,7 @@ function drawAdminMaterials() {
     <section class="screen">
       ${topBar('資料の管理', '管理メニュー')}
       <h1>資料の管理</h1>
-      <p class="hint">PDFはGoogleドライブ等の共有URLを登録します（このアプリにファイルは保存しません）。共有設定は「リンクを知っている全員が閲覧可」にしてください。</p>
+      <p class="hint">「資料を追加」で<strong>ファイルをアップロード</strong>（Cloudflareに保管・承認会員のみ閲覧）するか、Googleドライブ等の<strong>共有URL</strong>を登録できます。</p>
       <button class="btn" id="new-btn">＋ 資料を追加</button>
       ${mats.length ? mats.map(card).join('') : '<p class="muted">資料がありません。</p>'}
       <button class="btn back" id="back-btn" style="margin-top:8px;">‹ 管理メニュー</button>
@@ -1549,7 +1552,8 @@ function drawAdminMaterials() {
 const MATERIAL_CATEGORIES = ['会報', 'しおり', '総会資料', 'Q&A', 'その他'];
 
 function renderMaterialForm(m) {
-  const cur = m || { title: '', category: 'その他', url: '', visibility: '公開', status: '公開' };
+  const cur = m || { title: '', category: 'その他', url: '', status: '公開' };
+  const isFileMat = !!(m && m.isFile);
   $app.innerHTML = `
     <section class="screen">
       <h1>${m ? '資料の編集' : '資料の追加'}</h1>
@@ -1559,9 +1563,17 @@ function renderMaterialForm(m) {
       <select id="m-cat">
         ${MATERIAL_CATEGORIES.map(c => `<option value="${c}" ${cur.category === c ? 'selected' : ''}>${c}</option>`).join('')}
       </select>
-      <label>URL（PDF等の共有リンク） <span class="req">*</span></label>
-      <input id="m-url" type="url" placeholder="https://drive.google.com/..." value="${escapeAttr(cur.url)}">
-      <p class="hint">資料はすべて会員限定です（登録会員のみ閲覧できます）。</p>
+      ${isFileMat ? `
+      <div class="card"><p>アップロード済みファイル：<strong>${escapeHtml(cur.note || cur.title)}</strong></p>
+      <p class="muted">差し替えるときは、新しく「資料を追加」してください。</p></div>` : `
+      ${m ? '' : `
+      <label>① ファイルをアップロード（PDF等）</label>
+      <input id="m-file" type="file" accept="application/pdf,image/*">
+      <p class="hint">アップロードしたファイルは Cloudflare に安全に保管し、<strong>承認会員だけ</strong>が閲覧できます（リンクが漏れても期限切れ＆認証で保護）。</p>
+      <label>② または URL（Googleドライブ等の共有リンク）</label>` /* edit-link: just URL */}
+      ${m ? '<label>URL（共有リンク）</label>' : ''}
+      <input id="m-url" type="url" placeholder="https://drive.google.com/..." value="${escapeAttr(cur.url)}">`}
+      <p class="hint">資料はすべて会員限定です（登録会員のみ閲覧）。</p>
       <label class="check"><input type="checkbox" id="m-pub" ${cur.status !== '非公開' ? 'checked' : ''}> 公開する（オフで非公開＝会員にも表示されません）</label>
       <div class="actions">
         <button class="btn back" id="back-btn">‹ 戻る</button>
@@ -1572,19 +1584,45 @@ function renderMaterialForm(m) {
   document.getElementById('back-btn').onclick = renderAdminMaterials;
   document.getElementById('submit-btn').onclick = async () => {
     const title = document.getElementById('m-title').value.trim();
-    const url = document.getElementById('m-url').value.trim();
     const category = document.getElementById('m-cat').value;
     const status = document.getElementById('m-pub').checked ? '公開' : '非公開';
-    if (!title || !url) {
-      alert('タイトルとURLは必須です。');
+    if (!title) { alert('タイトルは必須です。'); return; }
+
+    const fileInput = document.getElementById('m-file');
+    const file = fileInput && fileInput.files && fileInput.files[0];
+    if (file) {
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true; btn.textContent = 'アップロード中...';
+      const res = await uploadMaterialFile(file, { title, category, status });
+      if (res.ok) { renderAdminMaterials(); }
+      else { alert('アップロードに失敗しました：' + (res.error || 'unknown')); btn.disabled = false; btn.textContent = '保存'; }
       return;
     }
-    const payload = { title, url, category, status }; // 公開範囲はサーバで常に会員限定
+
+    const urlEl = document.getElementById('m-url');
+    const url = urlEl ? urlEl.value.trim() : '';
+    if (!isFileMat && !url) { alert('ファイルを選ぶか、URLを入力してください。'); return; }
+    const payload = { title, url, category, status };
     if (m) payload.id = m.id;
     const res = await callApi('adminUpsertMaterial', payload);
     if (res.ok) { renderAdminMaterials(); }
     else { alert('保存に失敗しました：' + (res.error || 'unknown')); }
   };
+}
+
+// 管理者によるファイルアップロード（R2へ。認証はX-Id-Tokenヘッダ）
+async function uploadMaterialFile(file, meta) {
+  try {
+    const qs = new URLSearchParams({ title: meta.title, category: meta.category, status: meta.status, filename: file.name }).toString();
+    const res = await fetch(window.APP_CONFIG.GAS_URL.replace(/\/$/, '') + '/upload?' + qs, {
+      method: 'POST',
+      headers: { 'Content-Type': file.type || 'application/octet-stream', 'X-Id-Token': state.idToken },
+      body: file,
+    });
+    return await res.json();
+  } catch (e) {
+    return { ok: false, error: 'network_error' };
+  }
 }
 
 // CSV生成＆ダウンロード（Excelの文字化け回避にUTF-8 BOMを付与）
