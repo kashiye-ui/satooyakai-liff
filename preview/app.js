@@ -109,6 +109,7 @@ function getView() {
 
 // マイページ（ホーム）へ戻る。最新の登録状態を取り直して表示する。
 async function goHome() {
+  rememberAdmin(null); // 管理画面から離れるので記憶クリア
   const result = await callApi('checkUser', {});
   if (result.ok && result.registered) {
     if (result.pending) return renderPending(result);
@@ -891,6 +892,17 @@ function wireTableControls(view, draw) {
 }
 
 // ===== 管理画面（運営・理事向け / ?view=admin） =====
+// 直近に開いていた管理ページを記憶し、リロード時に復元する（?view=admin はURL不変のため）。
+function rememberAdmin(name, param) {
+  try {
+    if (name) sessionStorage.setItem('kl_admin_sec', JSON.stringify({ name, param: param || null }));
+    else sessionStorage.removeItem('kl_admin_sec');
+  } catch (e) { /* noop */ }
+}
+function lastAdmin() {
+  try { return JSON.parse(sessionStorage.getItem('kl_admin_sec') || 'null'); } catch (e) { return null; }
+}
+
 async function renderAdmin() {
   $app.innerHTML = `<section class="screen"><h1>管理</h1><p>読み込み中...</p></section>`;
   const res = await callApi('adminCheck', {});
@@ -909,10 +921,20 @@ async function renderAdmin() {
     document.getElementById('home-btn').onclick = goHome;
     return;
   }
+  // リロード時：直近に見ていた管理ページを復元
+  const sec = lastAdmin();
+  if (sec) {
+    if (sec.name === 'members') return renderAdminHouseholds();
+    if (sec.name === 'fees') return renderAdminFees();
+    if (sec.name === 'materials') return renderAdminMaterials();
+    if (sec.name === 'events') return renderAdminEvents();
+    if (sec.name === 'roster' && sec.param) return renderAdminRoster(sec.param);
+  }
   return renderAdminHome();
 }
 
 async function renderAdminHome() {
+  rememberAdmin(null); // 管理トップ：記憶クリア
   // 承認待ち件数（バッジ用）。取得失敗時は0扱い。
   let pending = 0;
   try { const r = await callApi('adminPendingCount', {}); if (r.ok) pending = r.count || 0; } catch (e) { /* noop */ }
@@ -938,6 +960,7 @@ async function renderAdminHome() {
 }
 
 async function renderAdminEvents() {
+  rememberAdmin('events');
   $app.innerHTML = `<section class="screen"><h1>行事の参加者管理</h1><p>読み込み中...</p></section>`;
   const res = await callApi('adminListEvents', {});
   if (!res.ok) return renderActionError('行事の参加者管理', res.error);
@@ -1039,6 +1062,7 @@ function renderEventForm(ev) {
 }
 
 async function renderAdminRoster(eventId) {
+  rememberAdmin('roster', eventId);
   $app.innerHTML = `<section class="screen"><h1>参加者一覧</h1><p>読み込み中...</p></section>`;
   const res = await callApi('adminEventRoster', { eventId });
   if (!res.ok) return renderActionError('参加者一覧', res.error);
@@ -1217,6 +1241,7 @@ function renderProxyAttendanceForm(eventId, event, hh, cur) {
 }
 
 async function renderAdminHouseholds() {
+  rememberAdmin('members');
   $app.innerHTML = `<section class="screen"><h1>会員名簿</h1><p>読み込み中...</p></section>`;
   const res = await callApi('adminListHouseholds', {});
   if (!res.ok) return renderActionError('会員名簿', res.error);
@@ -1431,6 +1456,7 @@ function renderProxyAddMember(hh) {
 
 // ===== 管理: 会費の管理 =====
 async function renderAdminFees() {
+  rememberAdmin('fees');
   $app.innerHTML = `<section class="screen"><h1>会費の管理</h1><p>読み込み中...</p></section>`;
   const res = await callApi('adminListHouseholds', {});
   if (!res.ok) return renderActionError('会費の管理', res.error);
@@ -1509,6 +1535,7 @@ function drawAdminFees() {
 
 // ===== 管理: 資料の管理 =====
 async function renderAdminMaterials() {
+  rememberAdmin('materials');
   $app.innerHTML = `<section class="screen"><h1>資料の管理</h1><p>読み込み中...</p></section>`;
   const res = await callApi('adminListAllMaterials', {});
   if (!res.ok) return renderActionError('資料の管理', res.error);
