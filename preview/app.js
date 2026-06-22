@@ -974,6 +974,7 @@ async function renderAdminEvents() {
       <div class="actions" style="margin-top:6px;">
         <button class="chip roster-btn" data-id="${escapeAttr(e.eventId)}">参加者一覧</button>
         <button class="chip ev-edit" data-i="${i}">編集</button>
+        <button class="chip ev-notify" data-i="${i}">📢 LINEにて通知</button>
       </div>
     </div>`;
   $app.innerHTML = `
@@ -993,6 +994,12 @@ async function renderAdminEvents() {
   });
   document.querySelectorAll('button.ev-edit').forEach(b => {
     b.onclick = () => renderEventForm(state.adminEvents[+b.dataset.i]);
+  });
+  document.querySelectorAll('button.ev-notify').forEach(b => {
+    b.onclick = () => {
+      const e = state.adminEvents[+b.dataset.i];
+      renderBroadcastCompose({ text: defaultEventNoticeText(e), back: renderAdminEvents, backLabel: '行事の参加者管理', remember: 'events' });
+    };
   });
 }
 
@@ -1583,26 +1590,43 @@ function drawAdminMaterials() {
     };
   });
   document.querySelectorAll('button.mat-notify').forEach(b => {
-    b.onclick = () => renderBroadcastCompose(mats[+b.dataset.i]);
+    b.onclick = () => {
+      const m = mats[+b.dataset.i];
+      renderBroadcastCompose({ text: defaultMaterialNoticeText(m), back: renderAdminMaterials, backLabel: '資料の管理', remember: 'materials' });
+    };
   });
 }
 
-// ===== 管理: LINE一斉配信（資料の「LINEにて通知」から開く） =====
-// material を渡すと既定文を自動入力。文面は自由に編集できる。
-function defaultNoticeText(m) {
-  const docsUrl = `https://liff.line.me/${window.APP_CONFIG.LIFF_ID}?view=docs`;
+// ===== 管理: LINE一斉配信（資料/行事の「LINEにて通知」から開く） =====
+// 既定文は自由に編集できる。資料・行事それぞれで雛形が違う。
+function liffViewUrl(view) { return `https://liff.line.me/${window.APP_CONFIG.LIFF_ID}?view=${view}`; }
+
+function defaultMaterialNoticeText(m) {
   return `【さいたま市里親会】お知らせ\n\n`
     + `新しい資料「${m ? m.title : ''}」を公開しました。\n`
     + `アプリの「お役立ち資料」からご覧ください。\n\n`
-    + `▼ひらく\n${docsUrl}`;
+    + `▼ひらく\n${liffViewUrl('docs')}`;
 }
 
-async function renderBroadcastCompose(material) {
-  rememberAdmin('materials'); // 戻り先は資料の管理
-  const initial = defaultNoticeText(material);
+function defaultEventNoticeText(e) {
+  const lines = ['【さいたま市里親会】行事のご案内', '', `「${e ? e.name : ''}」`];
+  if (e && e.date) lines.push(`日時：${e.date}`);
+  if (e && e.place) lines.push(`場所：${e.place}`);
+  if (e && e.deadline) lines.push(`申込締切：${e.deadline}`);
+  lines.push('', 'アプリから出欠をご回答ください。', '', '▼出欠を回答', liffViewUrl('events'));
+  return lines.join('\n');
+}
+
+// opts = { text, back, backLabel, remember }
+async function renderBroadcastCompose(opts) {
+  const o = opts || {};
+  const initial = o.text || '';
+  const backFn = o.back || renderAdminMaterials;
+  const backLabel = o.backLabel || '資料の管理';
+  rememberAdmin(o.remember || 'materials'); // リロード時の戻り先
   $app.innerHTML = `
     <section class="screen">
-      ${topBar('LINEにて通知', '資料の管理')}
+      ${topBar('LINEにて通知', backLabel)}
       <h1>LINEにて通知</h1>
       <div class="card warn">
         <p><strong>公式LINEの友だち全員に一斉配信します。</strong></p>
@@ -1613,7 +1637,7 @@ async function renderBroadcastCompose(material) {
       <textarea id="bc-text" rows="12" style="width:100%;box-sizing:border-box;">${escapeHtml(initial)}</textarea>
       <p class="hint"><span id="bc-count">0</span>/4900字。リンクを載せると会員はタップで資料一覧を開けます（未承認の方は閲覧できません）。</p>
       <div class="actions">
-        <button class="btn back" id="back-btn">‹ 資料の管理</button>
+        <button class="btn back" id="back-btn">‹ ${escapeHtml(backLabel)}</button>
         <button class="btn primary" id="send-btn">この内容で配信する</button>
       </div>
     </section>
@@ -1622,8 +1646,8 @@ async function renderBroadcastCompose(material) {
   const cnt = document.getElementById('bc-count');
   const updateCount = () => { cnt.textContent = String(ta.value.length); };
   ta.addEventListener('input', updateCount); updateCount();
-  document.getElementById('topback').onclick = renderAdminMaterials;
-  document.getElementById('back-btn').onclick = renderAdminMaterials;
+  document.getElementById('topback').onclick = backFn;
+  document.getElementById('back-btn').onclick = backFn;
 
   // 残り通数を表示
   (async () => {
@@ -1654,9 +1678,9 @@ async function renderBroadcastCompose(material) {
         <section class="screen">
           <h1>配信しました</h1>
           <div class="card"><p>✅ 公式LINEの友だち全員に配信しました。</p></div>
-          <button class="btn back" id="done-btn">‹ 資料の管理</button>
+          <button class="btn back" id="done-btn">‹ ${escapeHtml(backLabel)}</button>
         </section>`;
-      document.getElementById('done-btn').onclick = renderAdminMaterials;
+      document.getElementById('done-btn').onclick = backFn;
     } else {
       const msg = res.error === 'no_token' ? '配信用トークンが未設定です。'
         : res.error === 'line_api_error' ? `LINE側でエラー（${res.status}）：${res.detail || ''}`
