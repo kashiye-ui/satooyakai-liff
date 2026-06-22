@@ -1553,6 +1553,7 @@ function drawAdminMaterials() {
       <div class="actions" style="margin-top:6px;">
         <button class="chip ${m.status === '公開' ? 'on' : 'off'} mat-toggle" data-i="${i}">${escapeHtml(m.status)}</button>
         <button class="chip mat-edit" data-i="${i}">編集</button>
+        <button class="chip mat-notify" data-i="${i}">📢 LINEにて通知</button>
       </div>
     </div>`;
   $app.innerHTML = `
@@ -1581,6 +1582,89 @@ function drawAdminMaterials() {
       else { alert('公開状態の更新に失敗しました：' + (resp.error || 'unknown')); b.disabled = false; }
     };
   });
+  document.querySelectorAll('button.mat-notify').forEach(b => {
+    b.onclick = () => renderBroadcastCompose(mats[+b.dataset.i]);
+  });
+}
+
+// ===== 管理: LINE一斉配信（資料の「LINEにて通知」から開く） =====
+// material を渡すと既定文を自動入力。文面は自由に編集できる。
+function defaultNoticeText(m) {
+  const docsUrl = `https://liff.line.me/${window.APP_CONFIG.LIFF_ID}?view=docs`;
+  return `【さいたま市里親会】お知らせ\n\n`
+    + `新しい資料「${m ? m.title : ''}」を公開しました。\n`
+    + `アプリの「お役立ち資料」からご覧ください。\n\n`
+    + `▼ひらく\n${docsUrl}`;
+}
+
+async function renderBroadcastCompose(material) {
+  rememberAdmin('materials'); // 戻り先は資料の管理
+  const initial = defaultNoticeText(material);
+  $app.innerHTML = `
+    <section class="screen">
+      ${topBar('LINEにて通知', '資料の管理')}
+      <h1>LINEにて通知</h1>
+      <div class="card warn">
+        <p><strong>公式LINEの友だち全員に一斉配信します。</strong></p>
+        <p class="muted">送信は取り消せません。配信前に文面と残り通数をご確認ください。</p>
+      </div>
+      <p class="muted" id="quota-line">残り通数を確認中...</p>
+      <label>配信する文面 <span class="req">*</span></label>
+      <textarea id="bc-text" rows="12" style="width:100%;box-sizing:border-box;">${escapeHtml(initial)}</textarea>
+      <p class="hint"><span id="bc-count">0</span>/4900字。リンクを載せると会員はタップで資料一覧を開けます（未承認の方は閲覧できません）。</p>
+      <div class="actions">
+        <button class="btn back" id="back-btn">‹ 資料の管理</button>
+        <button class="btn primary" id="send-btn">この内容で配信する</button>
+      </div>
+    </section>
+  `;
+  const ta = document.getElementById('bc-text');
+  const cnt = document.getElementById('bc-count');
+  const updateCount = () => { cnt.textContent = String(ta.value.length); };
+  ta.addEventListener('input', updateCount); updateCount();
+  document.getElementById('topback').onclick = renderAdminMaterials;
+  document.getElementById('back-btn').onclick = renderAdminMaterials;
+
+  // 残り通数を表示
+  (async () => {
+    const q = await callApi('broadcastQuota', {});
+    const el = document.getElementById('quota-line');
+    if (!el) return;
+    if (!q.ok) {
+      el.innerHTML = q.error === 'no_token'
+        ? '⚠️ 配信用トークンが未設定です（管理者にご連絡ください）。'
+        : '残り通数を取得できませんでした（' + escapeHtml(q.error || '') + '）。';
+      el.className = 'muted warn';
+      return;
+    }
+    if (q.remaining == null) { el.textContent = '今月の配信可能数：上限なし'; return; }
+    el.innerHTML = `今月の残り：<strong>約${q.remaining}通</strong>（上限${q.limit}・使用済${q.used}）。友だち1人につき1通を消費します。`;
+    if (q.remaining < 120) el.className = 'muted warn';
+  })();
+
+  document.getElementById('send-btn').onclick = async () => {
+    const text = ta.value.trim();
+    if (!text) { alert('文面を入力してください。'); return; }
+    if (!confirm('公式LINEの友だち全員に配信します。送信後は取り消せません。よろしいですか？')) return;
+    const btn = document.getElementById('send-btn');
+    btn.disabled = true; btn.textContent = '配信中...';
+    const res = await callApi('broadcast', { text });
+    if (res.ok && res.sent) {
+      $app.innerHTML = `
+        <section class="screen">
+          <h1>配信しました</h1>
+          <div class="card"><p>✅ 公式LINEの友だち全員に配信しました。</p></div>
+          <button class="btn back" id="done-btn">‹ 資料の管理</button>
+        </section>`;
+      document.getElementById('done-btn').onclick = renderAdminMaterials;
+    } else {
+      const msg = res.error === 'no_token' ? '配信用トークンが未設定です。'
+        : res.error === 'line_api_error' ? `LINE側でエラー（${res.status}）：${res.detail || ''}`
+        : (res.error || 'unknown');
+      alert('配信に失敗しました：' + msg);
+      btn.disabled = false; btn.textContent = 'この内容で配信する';
+    }
+  };
 }
 
 const MATERIAL_CATEGORIES = ['会報', 'しおり', '総会資料', 'Q&A', 'その他'];
