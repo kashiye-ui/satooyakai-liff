@@ -31,7 +31,50 @@ const state = {
   adminEvents: null,   // 管理: 行事一覧（編集フォーム用）
   adminFees: null,     // 管理: 会費 { fiscalYear, households, unpaidOnly }
   adminMaterials: null,// 管理: 資料一覧
+  matView: { q: '', filter: 'all', sort: 'date' },   // 資料の絞り込み・並べ替え
+  evtView: { q: '', filter: 'all', sort: 'date' },   // 行事の絞り込み・並べ替え
 };
+
+// ===== 一覧の検索＋絞り込みチップ＋並べ替えバー（資料・行事で共用） =====
+// opts: { view, filters:[{key,label,cls}], sorts:[{key,label}], placeholder, onChange }
+function listControlsHtml(opts) {
+  const v = opts.view;
+  const chips = opts.filters.map(f =>
+    `<button class="fchip${v.filter === f.key ? ' sel' : ''}${f.cls ? ' ' + f.cls : ''}" data-f="${f.key}">${escapeHtml(f.label)}</button>`).join('');
+  const sorts = opts.sorts.map(s =>
+    `<option value="${s.key}" ${v.sort === s.key ? 'selected' : ''}>${escapeHtml(s.label)}</option>`).join('');
+  return `
+    <div class="toolbar">
+      <span style="position:relative;flex:1 1 200px;display:flex;align-items:center">
+        <span style="position:absolute;left:10px;color:var(--muted);display:flex">${icon('search')}</span>
+        <input class="search-input" id="lc-q" style="padding-left:32px;flex:1" placeholder="${escapeHtml(opts.placeholder || '検索…')}" value="${escapeAttr(v.q)}">
+      </span>
+      <select class="sortselect" id="lc-sort">${sorts}</select>
+    </div>
+    <div class="filterbar" id="lc-filters">${chips}</div>`;
+}
+// onChange は「一覧部分だけ」を再描画する。検索欄・チップ自体は作り直さないので
+// 入力中にフォーカスが外れない。
+function wireListControls(opts) {
+  const v = opts.view;
+  const q = document.getElementById('lc-q');
+  if (q) q.oninput = () => { v.q = q.value; opts.onChange(); };
+  const sort = document.getElementById('lc-sort');
+  if (sort) sort.onchange = () => { v.sort = sort.value; opts.onChange(); };
+  document.querySelectorAll('#lc-filters .fchip').forEach(b => {
+    b.onclick = () => {
+      v.filter = b.dataset.f;
+      document.querySelectorAll('#lc-filters .fchip').forEach(x => x.classList.toggle('sel', x === b));
+      opts.onChange();
+    };
+  });
+}
+// 検索語の一致（タイトル・カテゴリ等の連結文字列に対して）
+function matchQuery(q, text) {
+  const s = (q || '').trim().toLowerCase();
+  if (!s) return true;
+  return String(text || '').toLowerCase().includes(s);
+}
 
 const $app = document.getElementById('app');
 
@@ -220,24 +263,25 @@ function renderHome(data) {
         <p><strong>あなたのお立場:</strong> ${escapeHtml(m.role || '')}</p>
       </div>
 
-      <button class="card-btn" id="nav-events">
-        <strong>イベント</strong>
-        <span>行事の案内・出欠の回答・参加履歴</span>
+      <button class="card-btn cat-event" id="nav-events">
+        <span class="cat-ic">${icon('calendar', 'ic-lg')}</span>
+        <span class="cat-tx"><strong>行事・申込</strong><span>行事の案内・出欠の回答・参加履歴</span></span>
       </button>
-      <button class="card-btn" id="nav-docs">
-        <strong>お役立ち資料</strong>
-        <span>しおり・会報・総会資料・Q&amp;A</span>
+      <button class="card-btn cat-docs" id="nav-docs">
+        <span class="cat-ic">${icon('book', 'ic-lg')}</span>
+        <span class="cat-tx"><strong>お役立ち資料</strong><span>しおり・会報・総会資料・Q&amp;A</span></span>
       </button>
 
       ${data.isAdmin ? `
-      <button class="card-btn" id="nav-admin">
-        <strong>管理メニュー</strong>
-        <span>運営・理事用（会員名簿・行事・会費・資料）</span>
+      <button class="card-btn cat-admin" id="nav-admin">
+        <span class="cat-ic">${icon('admin', 'ic-lg')}</span>
+        <span class="cat-tx"><strong>管理メニュー</strong><span>運営・理事用（会員名簿・行事・会費・資料）</span></span>
       </button>` : ''}
 
       <p class="muted">ご家族も、それぞれのLINEから「家族として参加」でご登録いただけます。</p>
     </section>
   `;
+  document.body.classList.remove('lean'); // 会員向けは温かい背景のまま
   document.getElementById('nav-events').onclick = renderEvents;
   document.getElementById('nav-docs').onclick = renderDocs;
   if (data.isAdmin) {
@@ -340,21 +384,22 @@ async function renderEvents() {
       <p><strong>${escapeHtml(e.name)}</strong></p>
       <p class="muted">${escapeHtml(e.date)}${e.place ? ' ／ ' + escapeHtml(e.place) : ''}</p>
       <p class="muted">${feeText(e)}${e.deadline ? ' ／ 申込締切 ' + escapeHtml(e.deadline) : ''}</p>
-      ${e.myResponse ? `<p>✓ 回答済み：大人 ${e.myResponse.adultCount}名・子ども ${e.myResponse.childCount}名${e.myResponse.total > 0 ? '（参加費 ' + e.myResponse.total.toLocaleString() + '円）' : ''}</p>` : ''}
+      ${e.myResponse ? `<p>${statusBadge('ok', '回答済み')} 大人 ${e.myResponse.adultCount}名・子ども ${e.myResponse.childCount}名${e.myResponse.total > 0 ? '（参加費 ' + e.myResponse.total.toLocaleString() + '円）' : ''}</p>` : ''}
       <button class="btn primary act" data-id="${escapeAttr(e.eventId)}">${e.myResponse ? '回答を変更する' : '出欠を回答する'}</button>
     </div>`;
 
   const pastCard = (e) => `
     <div class="card">
-      <p><strong>${escapeHtml(e.name)}</strong> <span class="muted">（${escapeHtml(e.status)}）</span></p>
+      <p><strong>${escapeHtml(e.name)}</strong> ${statusBadge(eventStatusKind(e.status), e.status)}</p>
       <p class="muted">${escapeHtml(e.date)}${e.place ? ' ／ ' + escapeHtml(e.place) : ''}</p>
       ${e.myResponse ? `<p>参加：大人 ${e.myResponse.adultCount}名・子ども ${e.myResponse.childCount}名</p>` : '<p class="muted">参加記録なし</p>'}
     </div>`;
 
+  document.body.classList.remove('lean');
   $app.innerHTML = `
     <section class="screen">
-      ${topBar('イベント', 'マイページ')}
-      <h1>イベント</h1>
+      ${topBar('行事・申込', 'マイページ')}
+      <h1>行事・申込</h1>
       <h2 class="sub">受付中の行事</h2>
       ${open.length ? open.map(openCard).join('') : '<p class="muted">現在、受付中の行事はありません。</p>'}
       ${past.length ? `<h2 class="sub">過去の行事</h2>${past.map(pastCard).join('')}` : ''}
@@ -439,13 +484,14 @@ async function renderDocs() {
     body = Object.keys(groups).map(cat => `
       <h2 class="sub">${escapeHtml(cat)}</h2>
       ${groups[cat].map(m => `
-        <button class="card-btn doc-link" data-id="${escapeAttr(m.id)}">
-          <strong>${escapeHtml(m.title)}</strong>
-          <span>${escapeHtml(m.publishedAt || '')}</span>
+        <button class="card-btn cat-docs doc-link" data-id="${escapeAttr(m.id)}">
+          <span class="cat-ic">${icon('book', 'ic-lg')}</span>
+          <span class="cat-tx"><strong>${escapeHtml(m.title)}</strong><span>${escapeHtml(m.publishedAt || '')}</span></span>
         </button>`).join('')}
     `).join('');
   }
 
+  document.body.classList.remove('lean');
   $app.innerHTML = `
     <section class="screen">
       ${topBar('お役立ち資料', 'マイページ')}
@@ -904,6 +950,7 @@ function lastAdmin() {
 }
 
 async function renderAdmin() {
+  document.body.classList.add('lean'); // 管理画面はすっきり（背景を淡く）
   $app.innerHTML = `<section class="screen"><h1>管理</h1><p>読み込み中...</p></section>`;
   const res = await callApi('adminCheck', {});
   if (!res.ok) return renderActionError('管理', res.error);
@@ -934,6 +981,7 @@ async function renderAdmin() {
 }
 
 async function renderAdminHome() {
+  document.body.classList.add('lean'); // 管理画面はすっきり（背景を淡く）
   rememberAdmin(null); // 管理トップ：記憶クリア
   // 承認待ち件数（バッジ用）。取得失敗時は0扱い。
   let pending = 0;
@@ -942,11 +990,11 @@ async function renderAdminHome() {
   $app.innerHTML = `
     <section class="screen">
       <h1>さいたま市里親会 管理メニュー</h1>
-      ${pending ? `<button class="card-btn alert-btn" id="a-pending"><strong>⚠ 承認待ちが ${pending}件あります</strong><span>タップして会員名簿で承認/却下</span></button>` : ''}
-      <button class="card-btn" id="a-events"><strong>行事の参加者管理</strong><span>申込状況・参加費の回収・代理入力・CSV出力</span></button>
-      <button class="card-btn" id="a-members"><strong>会員名簿${badge}</strong><span>世帯・個人の一覧・承認・LINEなし世帯の代理登録・CSV</span></button>
-      <button class="card-btn" id="a-fees"><strong>会費の管理</strong><span>年会費の納付状況・未納一覧</span></button>
-      <button class="card-btn" id="a-materials"><strong>資料の管理</strong><span>会報・しおり等の追加・公開/非公開</span></button>
+      ${pending ? `<button class="card-btn alert-btn" id="a-pending"><strong>${icon('alert')} 承認待ちが ${pending}件あります</strong><span>タップして会員名簿で承認/却下</span></button>` : ''}
+      <button class="card-btn" id="a-events"><strong>${icon('calendar')} 行事の参加者管理</strong><span>申込状況・参加費の回収・代理入力・CSV出力</span></button>
+      <button class="card-btn" id="a-members"><strong>${icon('user')} 会員名簿${badge}</strong><span>世帯・個人の一覧・承認・LINEなし世帯の代理登録・CSV</span></button>
+      <button class="card-btn" id="a-fees"><strong>${icon('money')} 会費の管理</strong><span>年会費の納付状況・未納一覧</span></button>
+      <button class="card-btn" id="a-materials"><strong>${icon('book')} 資料の管理</strong><span>会報・しおり等の追加・公開/非公開</span></button>
       <button class="btn back" id="home-btn" style="margin-top:24px;">‹ マイページ</button>
     </section>
   `;
@@ -960,46 +1008,78 @@ async function renderAdminHome() {
 }
 
 async function renderAdminEvents() {
+  document.body.classList.add('lean');
   rememberAdmin('events');
   $app.innerHTML = `<section class="screen"><h1>行事の参加者管理</h1><p>読み込み中...</p></section>`;
   const res = await callApi('adminListEvents', {});
   if (!res.ok) return renderActionError('行事の参加者管理', res.error);
-  const evs = res.events || [];
-  state.adminEvents = evs;
-  const card = (e, i) => `
-    <div class="card">
-      <p><strong>${escapeHtml(e.name)}</strong> <span class="muted">（${escapeHtml(e.status)}）${e.hasFeeSchedule ? '・区分別料金' : ''}</span></p>
-      <p class="muted">${escapeHtml(e.date)}${e.place ? ' ／ ' + escapeHtml(e.place) : ''}</p>
-      <p class="muted">${e.counts.households}世帯・大人${e.counts.adults}・子ども${e.counts.children}</p>
-      <div class="actions" style="margin-top:6px;">
-        <button class="chip roster-btn" data-id="${escapeAttr(e.eventId)}">参加者一覧</button>
-        <button class="chip ev-edit" data-i="${i}">編集</button>
-        <button class="chip ev-notify" data-i="${i}">📢 LINEにて通知</button>
-      </div>
-    </div>`;
+  state.adminEvents = res.events || [];
+  const v = state.evtView;
+  const controls = listControlsHtml({
+    view: v,
+    placeholder: '行事名・場所で検索…',
+    filters: [
+      { key: 'all', label: 'すべて' },
+      { key: '募集中', label: '募集中' },
+      { key: '開催済', label: '開催済' },
+      { key: '中止', label: '中止' },
+    ],
+    sorts: [
+      { key: 'date', label: '開催日が新しい順' },
+      { key: 'date-asc', label: '開催日が近い順' },
+      { key: 'name', label: '行事名順' },
+    ],
+  });
   $app.innerHTML = `
     <section class="screen">
       ${topBar('行事の参加者管理', '管理メニュー')}
-      <h1>行事の参加者管理</h1>
-      <button class="btn" id="new-ev-btn">＋ 行事を新規作成</button>
-      ${evs.length ? evs.map(card).join('') : '<p class="muted">行事がありません。</p>'}
+      <h1>${icon('calendar')} 行事の参加者管理</h1>
+      <button class="btn" id="new-ev-btn">${icon('plus')} 行事を新規作成</button>
+      ${controls}
+      <div id="evt-list"></div>
       <button class="btn back" id="back-btn" style="margin-top:24px;">‹ 管理メニュー</button>
     </section>
   `;
   document.getElementById('topback').onclick = renderAdminHome;
   document.getElementById('back-btn').onclick = renderAdminHome;
   document.getElementById('new-ev-btn').onclick = () => renderEventForm(null);
-  document.querySelectorAll('button.roster-btn').forEach(b => {
-    b.onclick = () => renderAdminRoster(b.dataset.id);
+  wireListControls({ view: v, onChange: paintAdminEvents });
+  paintAdminEvents();
+}
+
+function eventAdminCard(e) {
+  return `
+    <div class="card">
+      <p><strong>${escapeHtml(e.name)}</strong> ${statusBadge(eventStatusKind(e.status), e.status)}${e.hasFeeSchedule ? ' <span class="muted">区分別料金</span>' : ''}</p>
+      <p class="muted">${escapeHtml(e.date)}${e.place ? ' ／ ' + escapeHtml(e.place) : ''}</p>
+      <p class="muted">${e.counts.households}世帯・大人${e.counts.adults}・子ども${e.counts.children}</p>
+      <div class="actions" style="margin-top:6px;">
+        <button class="chip roster-btn" data-id="${escapeAttr(e.eventId)}">${icon('list')}参加者一覧</button>
+        <button class="chip ev-edit" data-id="${escapeAttr(e.eventId)}">${icon('edit')}編集</button>
+        <button class="chip ev-notify" data-id="${escapeAttr(e.eventId)}">${icon('send')}LINEにて通知</button>
+      </div>
+    </div>`;
+}
+
+function paintAdminEvents() {
+  const v = state.evtView;
+  let list = (state.adminEvents || []).filter(e => {
+    if (v.filter !== 'all' && e.status !== v.filter) return false;
+    return matchQuery(v.q, (e.name || '') + ' ' + (e.place || ''));
   });
-  document.querySelectorAll('button.ev-edit').forEach(b => {
-    b.onclick = () => renderEventForm(state.adminEvents[+b.dataset.i]);
+  list.sort((a, b) => {
+    if (v.sort === 'name') return (a.name || '').localeCompare(b.name || '', 'ja');
+    if (v.sort === 'date-asc') return (a.date || '').localeCompare(b.date || '');
+    return (b.date || '').localeCompare(a.date || ''); // 新しい順
   });
-  document.querySelectorAll('button.ev-notify').forEach(b => {
-    b.onclick = () => {
-      const e = state.adminEvents[+b.dataset.i];
-      renderBroadcastCompose({ text: defaultEventNoticeText(e), back: renderAdminEvents, backLabel: '行事の参加者管理', remember: 'events' });
-    };
+  const el = document.getElementById('evt-list');
+  if (!el) return;
+  el.innerHTML = list.length ? list.map(eventAdminCard).join('') : '<p class="muted">該当する行事がありません。</p>';
+  const byId = (id) => (state.adminEvents || []).find(e => e.eventId === id);
+  el.querySelectorAll('button.roster-btn').forEach(b => { b.onclick = () => renderAdminRoster(b.dataset.id); });
+  el.querySelectorAll('button.ev-edit').forEach(b => { b.onclick = () => renderEventForm(byId(b.dataset.id)); });
+  el.querySelectorAll('button.ev-notify').forEach(b => {
+    b.onclick = () => renderBroadcastCompose({ text: defaultEventNoticeText(byId(b.dataset.id)), back: renderAdminEvents, backLabel: '行事の参加者管理', remember: 'events' });
   });
 }
 
@@ -1550,49 +1630,90 @@ async function renderAdminMaterials() {
   drawAdminMaterials();
 }
 
-function drawAdminMaterials() {
-  const mats = state.adminMaterials;
-  const card = (m, i) => `
-    <div class="card${m.status === '非公開' ? ' warn' : ''}">
-      <p><strong>${escapeHtml(m.title)}</strong>
-         <span class="muted">${escapeHtml(m.category)}${m.isFile ? '・📎アップロード' : '・リンク'}</span></p>
+function materialCard(m) {
+  const isPub = m.status === '公開';
+  return `
+    <div class="card${isPub ? '' : ' warn'}">
+      <p><strong>${escapeHtml(m.title)}</strong></p>
+      <p class="muted">${escapeHtml(m.category)}${m.isFile ? '・📎アップロード' : '・リンク'}</p>
       <p class="muted" style="word-break:break-all;">${m.isFile ? '（Cloudflareに保管・認証配信）' : escapeHtml(m.url)}</p>
       <div class="actions" style="margin-top:6px;">
-        <button class="chip ${m.status === '公開' ? 'on' : 'off'} mat-toggle" data-i="${i}">${escapeHtml(m.status)}</button>
-        <button class="chip mat-edit" data-i="${i}">編集</button>
-        <button class="chip mat-notify" data-i="${i}">📢 LINEにて通知</button>
+        <button class="chip ${isPub ? 'on' : 'off'} mat-toggle" data-id="${escapeAttr(m.id)}">${icon(isPub ? 'check' : 'ban')}${isPub ? '公開中' : '非公開'}</button>
+        <button class="chip mat-edit" data-id="${escapeAttr(m.id)}">${icon('edit')}編集</button>
+        <button class="chip mat-notify" data-id="${escapeAttr(m.id)}">${icon('send')}LINEにて通知</button>
       </div>
     </div>`;
+}
+
+function drawAdminMaterials() {
+  const v = state.matView;
+  const controls = listControlsHtml({
+    view: v,
+    placeholder: 'タイトル・カテゴリで検索…',
+    filters: [
+      { key: 'all', label: 'すべて' },
+      { key: 'pub', label: '公開のみ' },
+      { key: 'hidden', label: '非公開のみ' },
+      { key: 'file', label: 'ファイル' },
+      { key: 'link', label: 'リンク' },
+    ],
+    sorts: [
+      { key: 'date', label: '公開日が新しい順' },
+      { key: 'title', label: 'タイトル順' },
+      { key: 'cat', label: 'カテゴリ順' },
+    ],
+  });
   $app.innerHTML = `
     <section class="screen">
       ${topBar('資料の管理', '管理メニュー')}
-      <h1>資料の管理</h1>
-      <p class="hint">「資料を追加」で<strong>ファイルをアップロード</strong>（Cloudflareに保管・承認会員のみ閲覧）するか、Googleドライブ等の<strong>共有URL</strong>を登録できます。</p>
-      <button class="btn" id="new-btn">＋ 資料を追加</button>
-      ${mats.length ? mats.map(card).join('') : '<p class="muted">資料がありません。</p>'}
+      <h1>${icon('book')} 資料の管理</h1>
+      <p class="hint">「資料を追加」で<strong>ファイルをアップロード</strong>（承認会員のみ閲覧）するか、共有<strong>URL</strong>を登録できます。</p>
+      <button class="btn" id="new-btn">${icon('plus')} 資料を追加</button>
+      ${controls}
+      <div id="mat-list"></div>
       <button class="btn back" id="back-btn" style="margin-top:8px;">‹ 管理メニュー</button>
     </section>
   `;
   document.getElementById('topback').onclick = renderAdminHome;
   document.getElementById('back-btn').onclick = renderAdminHome;
   document.getElementById('new-btn').onclick = () => renderMaterialForm(null);
-  document.querySelectorAll('button.mat-edit').forEach(b => {
-    b.onclick = () => renderMaterialForm(mats[+b.dataset.i]);
+  wireListControls({ view: v, onChange: paintAdminMaterials });
+  paintAdminMaterials();
+}
+
+function paintAdminMaterials() {
+  const v = state.matView;
+  let list = (state.adminMaterials || []).filter(m => {
+    if (v.filter === 'pub' && m.status !== '公開') return false;
+    if (v.filter === 'hidden' && m.status !== '非公開') return false;
+    if (v.filter === 'file' && !m.isFile) return false;
+    if (v.filter === 'link' && m.isFile) return false;
+    return matchQuery(v.q, (m.title || '') + ' ' + (m.category || ''));
   });
-  document.querySelectorAll('button.mat-toggle').forEach(b => {
+  list.sort((a, b) => {
+    if (v.sort === 'title') return (a.title || '').localeCompare(b.title || '', 'ja');
+    if (v.sort === 'cat') return (a.category || '').localeCompare(b.category || '', 'ja') || (a.title || '').localeCompare(b.title || '', 'ja');
+    return (b.publishedAt || '').localeCompare(a.publishedAt || ''); // 公開日の新しい順
+  });
+  const el = document.getElementById('mat-list');
+  if (!el) return;
+  el.innerHTML = list.length ? list.map(materialCard).join('') : '<p class="muted">該当する資料がありません。</p>';
+  const byId = (id) => (state.adminMaterials || []).find(m => m.id === id);
+  el.querySelectorAll('button.mat-edit').forEach(b => { b.onclick = () => renderMaterialForm(byId(b.dataset.id)); });
+  el.querySelectorAll('button.mat-notify').forEach(b => {
+    b.onclick = () => {
+      const m = byId(b.dataset.id);
+      renderBroadcastCompose({ text: defaultMaterialNoticeText(m), back: renderAdminMaterials, backLabel: '資料の管理', remember: 'materials' });
+    };
+  });
+  el.querySelectorAll('button.mat-toggle').forEach(b => {
     b.onclick = async () => {
-      const m = mats[+b.dataset.i];
+      const m = byId(b.dataset.id);
       const next = m.status === '公開' ? '非公開' : '公開';
       b.disabled = true;
       const resp = await callApi('adminSetMaterialStatus', { id: m.id, status: next });
-      if (resp.ok) { m.status = next; drawAdminMaterials(); }
+      if (resp.ok) { m.status = next; paintAdminMaterials(); }
       else { alert('公開状態の更新に失敗しました：' + (resp.error || 'unknown')); b.disabled = false; }
-    };
-  });
-  document.querySelectorAll('button.mat-notify').forEach(b => {
-    b.onclick = () => {
-      const m = mats[+b.dataset.i];
-      renderBroadcastCompose({ text: defaultMaterialNoticeText(m), back: renderAdminMaterials, backLabel: '資料の管理', remember: 'materials' });
     };
   });
 }
@@ -1799,5 +1920,40 @@ function escapeHtml(s) {
     .replace(/'/g, '&#39;');
 }
 function escapeAttr(s) { return escapeHtml(s); }
+
+// ===== インラインSVGアイコン（外部依存なし。currentColorで色がつく） =====
+const ICONS = {
+  calendar: '<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M8 3.5v3M16 3.5v3"/>',
+  book: '<path d="M5 4.5h11a2 2 0 0 1 2 2v13H7a2 2 0 0 0-2 2z"/><path d="M5 19.5a2 2 0 0 1 2-2h11"/>',
+  user: '<circle cx="12" cy="8.5" r="3.5"/><path d="M5 20c0-3.6 3-5.6 7-5.6s7 2 7 5.6"/>',
+  admin: '<path d="M4 8h9M19 8h1M4 16h5M15 16h5"/><circle cx="15.5" cy="8" r="2"/><circle cx="11.5" cy="16" r="2"/>',
+  money: '<rect x="3" y="6.5" width="18" height="11" rx="2"/><circle cx="12" cy="12" r="2.4"/>',
+  bell: '<path d="M6 9.5a6 6 0 0 1 12 0c0 4.5 2 5.5 2 5.5H4s2-1 2-5.5Z"/><path d="M10 19a2 2 0 0 0 4 0"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7"/>',
+  alert: '<circle cx="12" cy="12" r="8.5"/><path d="M12 8v5M12 15.5h.01"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5l3.5 2"/>',
+  ban: '<circle cx="12" cy="12" r="8.5"/><path d="M6.2 6.2l11.6 11.6"/>',
+  send: '<path d="M20.5 4 3.5 11l6.5 2.2L12 20l2-6z"/><path d="M20.5 4 9.8 13.2"/>',
+  download: '<path d="M12 4v10M8 11l4 4 4-4M5 19h14"/>',
+  search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/>',
+  back: '<path d="M14 6l-6 6 6 6"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
+  list: '<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
+};
+function icon(name, cls) {
+  const p = ICONS[name];
+  if (!p) return '';
+  return `<svg class="ic${cls ? ' ' + cls : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${p}</svg>`;
+}
+
+// 状態バッジ（色＋アイコン＋文字の三点で伝える）。kind: ok/todo/hold/off
+function statusBadge(kind, label) {
+  const map = { ok: ['st-ok', 'check'], todo: ['st-todo', 'alert'], hold: ['st-hold', 'clock'], off: ['st-off', 'ban'] };
+  const [cls, ic] = map[kind] || map.off;
+  return `<span class="st ${cls}">${icon(ic)}${escapeHtml(label)}</span>`;
+}
+// 行事の状態 → バッジ種別
+function eventStatusKind(s) { return s === '募集中' ? 'ok' : s === '中止' ? 'off' : 'hold'; }
 
 init();

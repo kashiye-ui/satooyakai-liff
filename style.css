@@ -15,6 +15,20 @@
   --yellow: #e3c069;   --yellow-soft: #fbf2d6;
   --lavender: #bfa9da; --lavender-soft: #efe9f7;
   --brown: #5d4037;         /* 木の実のこげ茶（リンク等） */
+
+  /* ===== 意味づけした色（セマンティック） ===== */
+  /* 状態の色：ものの「いま」を表す。色だけでなくアイコン＋文字も必ず添える。 */
+  --ok: #5f9350;     --ok-soft: #e8f1df;   --ok-ink: #3b6d11;   /* 済・有効・参加・納付済 */
+  --todo: #c97a4f;   --todo-soft: #f6e7df; --todo-ink: #9a3f22; /* 未・未納・要対応（そっと催促） */
+  --hold: #d8a23a;   --hold-soft: #f9efd5; --hold-ink: #7a5410; /* 承認待ち・保留 */
+  --off: #9a9087;    --off-soft: #efece6;  --off-ink: #5f5e5a;  /* 中止・終了・無効 */
+  --danger: #c0573f; --danger-soft: #f7dcd4; --danger-ink: #a3331c; /* 取消せない操作のみ */
+
+  /* カテゴリの色：行き先を表す。場所ごとに固定（順番で変えない）。 */
+  --cat-event: #5f9350;  --cat-event-soft: #e8f1df;  --cat-event-ink: #2f5410;
+  --cat-docs: #9b86c4;   --cat-docs-soft: #efe9f7;   --cat-docs-ink: #4b3b78;
+  --cat-member: #6d97c4; --cat-member-soft: #e6eff8; --cat-member-ink: #1c4a7a;
+  --cat-admin: #8d7355;  --cat-admin-soft: #efe7db;  --cat-admin-ink: #5d4037;
 }
 
 * { box-sizing: border-box; }
@@ -182,7 +196,61 @@ input[type="text"], input[type="tel"], input[type="number"], input:not([type]), 
 .card-btn:nth-of-type(4n+3) { background: var(--yellow-soft);   border-left-color: var(--yellow); }
 .card-btn:nth-of-type(4n+4) { background: var(--lavender-soft); border-left-color: var(--lavender); }
 /* 承認待ちの注意カード（順番色より優先） */
-.card-btn.alert-btn { background: var(--pink-soft); border-left-color: var(--pink); }
+.card-btn.alert-btn { background: var(--todo-soft); border-left-color: var(--todo); }
+
+/* ===== カテゴリ色：行き先ごとに固定（順番の循環色より優先） ===== */
+.card-btn.cat-event,
+.card-btn.cat-docs,
+.card-btn.cat-member,
+.card-btn.cat-admin { display: flex; align-items: center; gap: 12px; }
+.card-btn.cat-event  { background: var(--cat-event-soft);  border-left-color: var(--cat-event); }
+.card-btn.cat-docs   { background: var(--cat-docs-soft);   border-left-color: var(--cat-docs); }
+.card-btn.cat-member { background: var(--cat-member-soft); border-left-color: var(--cat-member); }
+.card-btn.cat-admin  { background: var(--cat-admin-soft);  border-left-color: var(--cat-admin); }
+.card-btn .cat-ic {
+  flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%;
+  background: #fff; display: inline-flex; align-items: center; justify-content: center;
+}
+.card-btn .cat-tx { flex: 1; }
+.card-btn.cat-event  .cat-ic { color: var(--cat-event); }
+.card-btn.cat-docs   .cat-ic { color: var(--cat-docs); }
+.card-btn.cat-member .cat-ic { color: var(--cat-member); }
+.card-btn.cat-admin  .cat-ic { color: var(--cat-admin); }
+.card-btn.cat-event  strong { color: var(--cat-event-ink); }
+.card-btn.cat-docs   strong { color: var(--cat-docs-ink); }
+.card-btn.cat-member strong { color: var(--cat-member-ink); }
+.card-btn.cat-admin  strong { color: var(--cat-admin-ink); }
+
+/* ===== インラインSVGアイコン（外部依存なし・currentColorで色付け） ===== */
+.ic { width: 1.1em; height: 1.1em; vertical-align: -0.15em; flex: 0 0 auto; }
+.ic-lg { width: 20px; height: 20px; }
+
+/* ===== 状態バッジ（色＋アイコン＋文字の三点で伝える） ===== */
+.st {
+  display: inline-flex; align-items: center; gap: 4px;
+  border-radius: 999px; padding: 2px 10px; font-size: 0.8rem; font-weight: 600;
+  white-space: nowrap;
+}
+.st .ic { width: 0.95em; height: 0.95em; }
+.st-ok     { background: var(--ok-soft);     color: var(--ok-ink); }
+.st-todo   { background: var(--todo-soft);   color: var(--todo-ink); }
+.st-hold   { background: var(--hold-soft);   color: var(--hold-ink); }
+.st-off    { background: var(--off-soft);    color: var(--off-ink); }
+.st-danger { background: var(--danger-soft); color: var(--danger-ink); }
+
+/* ===== 絞り込みチップ（一覧の上に並ぶ） ===== */
+.filterbar { display: flex; gap: 7px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
+.fchip {
+  border: 1px solid var(--border); background: #fff; color: var(--muted);
+  border-radius: 999px; padding: 5px 12px; font-size: 0.85rem; cursor: pointer;
+}
+.fchip.sel { background: var(--text); color: #fff; border-color: var(--text); }
+.fchip.sel.todo { background: var(--todo); border-color: var(--todo); }
+.fchip.sel.hold { background: var(--hold); border-color: var(--hold); }
+.sortselect { margin-top: 0; width: auto; flex: 0 0 auto; padding: 7px 10px; font-size: 0.85rem; }
+
+/* ===== 管理画面の“すっきりモード”：背景の絵柄をぐっと淡く ===== */
+body.lean::before { opacity: 0.04; }
 
 /* 件数バッジ（承認待ちなど） */
 .badge {
