@@ -249,6 +249,19 @@ input[type="text"], input[type="tel"], input[type="number"], input:not([type]), 
 .fchip.sel.hold { background: var(--hold); border-color: var(--hold); }
 .sortselect { margin-top: 0; width: auto; flex: 0 0 auto; padding: 7px 10px; font-size: 0.85rem; }
 
+/* ===== カテゴリの色チップ ===== */
+.catchip {
+  display: inline-block; border-radius: 999px; padding: 1px 10px;
+  font-size: 0.78rem; font-weight: 600; line-height: 1.6; vertical-align: middle;
+}
+
+/* ===== NEW バッジ（直近に更新・募集中の目印） ===== */
+.newbadge {
+  display: inline-block; background: #e2574c; color: #fff; -webkit-text-fill-color: #fff;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em;
+  border-radius: 4px; padding: 1px 6px; vertical-align: middle; line-height: 1.5;
+}
+
 /* ===== 管理画面の“すっきりモード”：背景の絵柄をぐっと淡く ===== */
 body.lean::before { opacity: 0.04; }
 

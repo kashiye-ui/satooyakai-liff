@@ -480,15 +480,23 @@ async function renderDocs() {
     body = '<p class="muted">現在、公開されている資料はありません。</p>';
   } else {
     const groups = {};
-    mats.forEach(m => { (groups[m.category] = groups[m.category] || []).push(m); });
-    body = Object.keys(groups).map(cat => `
-      <h2 class="sub">${escapeHtml(cat)}</h2>
+    mats.forEach(m => { (groups[m.category || 'その他'] = groups[m.category || 'その他'] || []).push(m); });
+    // カテゴリ順（イベント→会報→…）に並べ、一覧外カテゴリは末尾
+    const cats = Object.keys(groups).sort((a, b) => {
+      const ia = MATERIAL_CATEGORIES.indexOf(a), ib = MATERIAL_CATEGORIES.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+    body = cats.map(cat => {
+      const c = CATEGORY_COLORS[cat] || CATEGORY_COLORS['その他'];
+      const ic = categoryIcon(cat);
+      return `
+      <h2 class="sub">${categoryChip(cat)}</h2>
       ${groups[cat].map(m => `
-        <button class="card-btn cat-docs doc-link" data-id="${escapeAttr(m.id)}">
-          <span class="cat-ic">${icon('book', 'ic-lg')}</span>
-          <span class="cat-tx"><strong>${escapeHtml(m.title)}</strong><span>${escapeHtml(m.publishedAt || '')}</span></span>
-        </button>`).join('')}
-    `).join('');
+        <button class="card-btn cat-docs doc-link" data-id="${escapeAttr(m.id)}" style="background:${c[0]};border-left-color:${c[1]}">
+          <span class="cat-ic" style="color:${c[1]}">${icon(ic, 'ic-lg')}</span>
+          <span class="cat-tx"><strong style="color:${c[1]}">${escapeHtml(m.title)}</strong>${isNewByDate(m.publishedAt) ? ' ' + newBadge() : ''}<span>${escapeHtml(m.publishedAt || '')}</span></span>
+        </button>`).join('')}`;
+    }).join('');
   }
 
   document.body.classList.remove('lean');
@@ -1634,8 +1642,8 @@ function materialCard(m) {
   const isPub = m.status === '公開';
   return `
     <div class="card${isPub ? '' : ' warn'}">
-      <p><strong>${escapeHtml(m.title)}</strong></p>
-      <p class="muted">${escapeHtml(m.category)}${m.isFile ? '・📎アップロード' : '・リンク'}</p>
+      <p><strong>${escapeHtml(m.title)}</strong>${isNewByDate(m.publishedAt) ? ' ' + newBadge() : ''}</p>
+      <p>${categoryChip(m.category)} <span class="muted">${m.isFile ? '📎アップロード' : 'リンク'}・${escapeHtml(m.publishedAt || '')}</span></p>
       <p class="muted" style="word-break:break-all;">${m.isFile ? '（Cloudflareに保管・認証配信）' : escapeHtml(m.url)}</p>
       <div class="actions" style="margin-top:6px;">
         <button class="chip ${isPub ? 'on' : 'off'} mat-toggle" data-id="${escapeAttr(m.id)}">${icon(isPub ? 'check' : 'ban')}${isPub ? '公開中' : '非公開'}</button>
@@ -1812,11 +1820,38 @@ async function renderBroadcastCompose(opts) {
   };
 }
 
-const MATERIAL_CATEGORIES = ['会報', 'しおり', '総会資料', 'Q&A', 'その他'];
+const MATERIAL_CATEGORIES = ['イベント', '会報', '総会資料', 'Q&A', 'その他'];
+
+// カテゴリ別の色（淡い地＋濃い文字）。未知カテゴリは「その他」色。
+const CATEGORY_COLORS = {
+  'イベント': ['var(--ok-soft)', 'var(--ok-ink)'],
+  '会報': ['var(--cat-member-soft)', 'var(--cat-member-ink)'],
+  '総会資料': ['var(--cat-docs-soft)', 'var(--cat-docs-ink)'],
+  'Q&A': ['var(--hold-soft)', 'var(--hold-ink)'],
+  'その他': ['var(--off-soft)', 'var(--off-ink)'],
+};
+function categoryChip(cat) {
+  const c = CATEGORY_COLORS[cat] || CATEGORY_COLORS['その他'];
+  return `<span class="catchip" style="background:${c[0]};color:${c[1]}">${escapeHtml(cat || 'その他')}</span>`;
+}
+const CATEGORY_ICONS = { 'イベント': 'calendar', '会報': 'book', '総会資料': 'list', 'Q&A': 'bell', 'その他': 'book' };
+function categoryIcon(cat) { return CATEGORY_ICONS[cat] || 'book'; }
+// 直近 NEW_DAYS 日以内に登録/公開された資料は「NEW」
+const NEW_DAYS = 31;
+function isNewByDate(publishedAt) {
+  if (!publishedAt) return false;
+  const t = Date.parse(publishedAt + 'T00:00:00');
+  if (isNaN(t)) return false;
+  return (Date.now() - t) <= NEW_DAYS * 24 * 3600 * 1000 && (Date.now() - t) >= -2 * 24 * 3600 * 1000;
+}
+function newBadge() { return `<span class="newbadge">NEW</span>`; }
 
 function renderMaterialForm(m) {
-  const cur = m || { title: '', category: 'その他', url: '', status: '公開' };
+  const cur = m || { title: '', category: 'イベント', url: '', status: '公開' };
   const isFileMat = !!(m && m.isFile);
+  // 既存資料が一覧外の旧カテゴリ（例：しおり）を持つ場合は先頭に足して保持
+  const catOpts = MATERIAL_CATEGORIES.slice();
+  if (cur.category && !catOpts.includes(cur.category)) catOpts.unshift(cur.category);
   $app.innerHTML = `
     <section class="screen">
       <h1>${m ? '資料の編集' : '資料の追加'}</h1>
@@ -1824,7 +1859,7 @@ function renderMaterialForm(m) {
       <input id="m-title" value="${escapeAttr(cur.title)}">
       <label>カテゴリ</label>
       <select id="m-cat">
-        ${MATERIAL_CATEGORIES.map(c => `<option value="${c}" ${cur.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+        ${catOpts.map(c => `<option value="${c}" ${cur.category === c ? 'selected' : ''}>${c}</option>`).join('')}
       </select>
       ${isFileMat ? `
       <div class="card"><p>アップロード済みファイル：<strong>${escapeHtml(cur.note || cur.title)}</strong></p>
