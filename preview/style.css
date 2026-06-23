@@ -262,6 +262,13 @@ input[type="text"], input[type="tel"], input[type="number"], input:not([type]), 
   border-radius: 4px; padding: 1px 6px; vertical-align: middle; line-height: 1.5;
 }
 
+/* ===== 行事カード内：ひもづいた資料の導線 ===== */
+.docrow { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.docrow .evt-doc {
+  background: var(--cat-docs-soft); border-color: var(--cat-docs);
+  color: var(--cat-docs-ink); display: inline-flex; align-items: center; gap: 4px;
+}
+
 /* ===== 管理画面の“すっきりモード”：背景の絵柄をぐっと淡く ===== */
 body.lean::before { opacity: 0.04; }
 

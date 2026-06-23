@@ -379,20 +379,29 @@ async function renderEvents() {
   const open = state.events.filter(e => e.status === '募集中');
   const past = state.events.filter(e => e.status !== '募集中');
 
+  // ひもづいた資料（案内・しおり等）をタップで開ける導線に
+  const eventDocs = (e) => (e.materials && e.materials.length)
+    ? `<div class="docrow">${e.materials.map(d => `<button class="chip evt-doc" data-mid="${escapeAttr(d.id)}">${icon('book')} ${escapeHtml(d.title)}</button>`).join('')}</div>`
+    : '';
+
   const openCard = (e) => `
     <div class="card">
-      <p><strong>${escapeHtml(e.name)}</strong></p>
+      <p><strong>${escapeHtml(e.name)}</strong>${e.signup === 'external' ? ' ' + statusBadge('hold', '案内のみ') : ''}</p>
       <p class="muted">${escapeHtml(e.date)}${e.place ? ' ／ ' + escapeHtml(e.place) : ''}</p>
       <p class="muted">${feeText(e)}${e.deadline ? ' ／ 申込締切 ' + escapeHtml(e.deadline) : ''}</p>
-      ${e.myResponse ? `<p>${statusBadge('ok', '回答済み')} 大人 ${e.myResponse.adultCount}名・子ども ${e.myResponse.childCount}名${e.myResponse.total > 0 ? '（参加費 ' + e.myResponse.total.toLocaleString() + '円）' : ''}</p>` : ''}
-      <button class="btn primary act" data-id="${escapeAttr(e.eventId)}">${e.myResponse ? '回答を変更する' : '出欠を回答する'}</button>
+      ${eventDocs(e)}
+      ${e.signup === 'external'
+        ? '<p class="muted">お申し込み・お問い合わせは、上の案内をご覧ください。</p>'
+        : `${e.myResponse ? `<p>${statusBadge('ok', '回答済み')} 大人 ${e.myResponse.adultCount}名・子ども ${e.myResponse.childCount}名${e.myResponse.total > 0 ? '（参加費 ' + e.myResponse.total.toLocaleString() + '円）' : ''}</p>` : ''}
+      <button class="btn primary act" data-id="${escapeAttr(e.eventId)}">${e.myResponse ? '回答を変更する' : '出欠を回答する'}</button>`}
     </div>`;
 
   const pastCard = (e) => `
     <div class="card">
       <p><strong>${escapeHtml(e.name)}</strong> ${statusBadge(eventStatusKind(e.status), e.status)}</p>
       <p class="muted">${escapeHtml(e.date)}${e.place ? ' ／ ' + escapeHtml(e.place) : ''}</p>
-      ${e.myResponse ? `<p>参加：大人 ${e.myResponse.adultCount}名・子ども ${e.myResponse.childCount}名</p>` : '<p class="muted">参加記録なし</p>'}
+      ${eventDocs(e)}
+      ${e.myResponse ? `<p>参加：大人 ${e.myResponse.adultCount}名・子ども ${e.myResponse.childCount}名</p>` : ''}
     </div>`;
 
   document.body.classList.remove('lean');
@@ -412,6 +421,13 @@ async function renderEvents() {
     b.onclick = () => {
       const ev = (state.events || []).find(e => e.eventId === b.dataset.id);
       if (ev) renderAttendanceForm(ev);
+    };
+  });
+  document.querySelectorAll('button.evt-doc').forEach(b => {
+    b.onclick = async () => {
+      const res = await callApi('materialUrl', { id: b.dataset.mid });
+      if (res.ok && res.url) { openUrl(res.url, true); }
+      else { alert('資料を開けませんでした：' + (res.error || 'unknown')); }
     };
   });
 }
@@ -494,7 +510,7 @@ async function renderDocs() {
       ${groups[cat].map(m => `
         <button class="card-btn cat-docs doc-link" data-id="${escapeAttr(m.id)}" style="background:${c[0]};border-left-color:${c[1]}">
           <span class="cat-ic" style="color:${c[1]}">${icon(ic, 'ic-lg')}</span>
-          <span class="cat-tx"><strong style="color:${c[1]}">${escapeHtml(m.title)}</strong>${isNewByDate(m.publishedAt) ? ' ' + newBadge() : ''}<span>${escapeHtml(m.publishedAt || '')}</span></span>
+          <span class="cat-tx"><strong style="color:${c[1]}">${escapeHtml(m.title)}</strong>${isNewMaterial(m) ? ' ' + newBadge() : ''}<span>${escapeHtml(m.publishedAt || '')}</span></span>
         </button>`).join('')}`;
     }).join('');
   }
@@ -1058,9 +1074,9 @@ async function renderAdminEvents() {
 function eventAdminCard(e) {
   return `
     <div class="card">
-      <p><strong>${escapeHtml(e.name)}</strong> ${statusBadge(eventStatusKind(e.status), e.status)}${e.hasFeeSchedule ? ' <span class="muted">区分別料金</span>' : ''}</p>
+      <p><strong>${escapeHtml(e.name)}</strong> ${statusBadge(eventStatusKind(e.status), e.status)}${e.signup === 'external' ? ' ' + statusBadge('hold', '案内のみ') : ''}${e.hasFeeSchedule ? ' <span class="muted">区分別料金</span>' : ''}</p>
       <p class="muted">${escapeHtml(e.date)}${e.place ? ' ／ ' + escapeHtml(e.place) : ''}</p>
-      <p class="muted">${e.counts.households}世帯・大人${e.counts.adults}・子ども${e.counts.children}</p>
+      <p class="muted">${e.signup === 'external' ? '案内のみ（外部申込）' : `${e.counts.households}世帯・大人${e.counts.adults}・子ども${e.counts.children}`}${(e.materials && e.materials.length) ? ' ／ 📄資料' + e.materials.length + '件' : ''}</p>
       <div class="actions" style="margin-top:6px;">
         <button class="chip roster-btn" data-id="${escapeAttr(e.eventId)}">${icon('list')}参加者一覧</button>
         <button class="chip ev-edit" data-id="${escapeAttr(e.eventId)}">${icon('edit')}編集</button>
@@ -1120,6 +1136,12 @@ function renderEventForm(ev) {
       <input id="ev-deadline" type="date" value="${escapeAttr(c.deadline)}">
       <label>対象</label>
       <select id="ev-target">${targetOpts.map(t => `<option ${c.target === t ? 'selected' : ''}>${escapeHtml(t)}</option>`).join('')}</select>
+      <label>申込方式</label>
+      <select id="ev-signup">
+        <option value="liff" ${c.signup !== 'external' ? 'selected' : ''}>アプリで出欠を受け付ける（LIFF出欠）</option>
+        <option value="external" ${c.signup === 'external' ? 'selected' : ''}>案内のみ（申込は児相直通など外部）</option>
+      </select>
+      <p class="hint">「案内のみ」にすると出欠ボタンを出さず、ひもづけた案内（資料）だけを表示します。</p>
       <label>ステータス</label>
       <select id="ev-status">${EVENT_STATUSES.map(s => `<option ${c.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
       <label>備考</label>
@@ -1142,6 +1164,7 @@ function renderEventForm(ev) {
       capacity: parseInt(document.getElementById('ev-cap').value, 10) || 0,
       deadline: document.getElementById('ev-deadline').value,
       target: document.getElementById('ev-target').value,
+      signup: document.getElementById('ev-signup').value,
       status: document.getElementById('ev-status').value,
       note: document.getElementById('ev-note').value.trim(),
     };
@@ -1630,11 +1653,14 @@ function drawAdminFees() {
 
 // ===== 管理: 資料の管理 =====
 async function renderAdminMaterials() {
+  document.body.classList.add('lean');
   rememberAdmin('materials');
   $app.innerHTML = `<section class="screen"><h1>資料の管理</h1><p>読み込み中...</p></section>`;
   const res = await callApi('adminListAllMaterials', {});
   if (!res.ok) return renderActionError('資料の管理', res.error);
   state.adminMaterials = res.materials || [];
+  // 「関連する行事」選択肢のために行事一覧も読む（失敗しても資料管理は動く）
+  try { const ev = await callApi('adminListEvents', {}); if (ev.ok) state.adminEvents = ev.events || []; } catch (e) { /* noop */ }
   drawAdminMaterials();
 }
 
@@ -1642,8 +1668,8 @@ function materialCard(m) {
   const isPub = m.status === '公開';
   return `
     <div class="card${isPub ? '' : ' warn'}">
-      <p><strong>${escapeHtml(m.title)}</strong>${isNewByDate(m.publishedAt) ? ' ' + newBadge() : ''}</p>
-      <p>${categoryChip(m.category)} <span class="muted">${m.isFile ? '📎アップロード' : 'リンク'}・${escapeHtml(m.publishedAt || '')}</span></p>
+      <p><strong>${escapeHtml(m.title)}</strong>${isNewMaterial(m) ? ' ' + newBadge() : ''}</p>
+      <p>${categoryChip(m.category)} <span class="muted">${m.isFile ? '📎アップロード' : 'リンク'}・${escapeHtml(m.publishedAt || '')}</span>${m.eventName ? ` <span class="muted">／🔗 ${escapeHtml(m.eventName)}</span>` : ''}</p>
       <p class="muted" style="word-break:break-all;">${m.isFile ? '（Cloudflareに保管・認証配信）' : escapeHtml(m.url)}</p>
       <div class="actions" style="margin-top:6px;">
         <button class="chip ${isPub ? 'on' : 'off'} mat-toggle" data-id="${escapeAttr(m.id)}">${icon(isPub ? 'check' : 'ban')}${isPub ? '公開中' : '非公開'}</button>
@@ -1845,6 +1871,8 @@ function isNewByDate(publishedAt) {
   return (Date.now() - t) <= NEW_DAYS * 24 * 3600 * 1000 && (Date.now() - t) >= -2 * 24 * 3600 * 1000;
 }
 function newBadge() { return `<span class="newbadge">NEW</span>`; }
+// 資料がNEW＝直近31日に登録 または ひもづく行事が募集中（終了で自動的に消える）
+function isNewMaterial(m) { return isNewByDate(m && m.publishedAt) || !!(m && m.eventOpen); }
 
 function renderMaterialForm(m) {
   const cur = m || { title: '', category: 'イベント', url: '', status: '公開' };
@@ -1861,6 +1889,12 @@ function renderMaterialForm(m) {
       <select id="m-cat">
         ${catOpts.map(c => `<option value="${c}" ${cur.category === c ? 'selected' : ''}>${c}</option>`).join('')}
       </select>
+      <label>関連する行事（任意）</label>
+      <select id="m-event">
+        <option value="">（なし）</option>
+        ${(state.adminEvents || []).map(e => `<option value="${escapeAttr(e.eventId)}" ${cur.eventId === e.eventId ? 'selected' : ''}>${escapeHtml(e.name)}（${escapeHtml(e.date || '')}）</option>`).join('')}
+      </select>
+      <p class="hint">行事にひもづけると、その行事一覧にも資料が表示され、募集中の間は「NEW」が付きます。行事側は「行事の管理」で作成できます。</p>
       ${isFileMat ? `
       <div class="card"><p>アップロード済みファイル：<strong>${escapeHtml(cur.note || cur.title)}</strong></p>
       <p class="muted">差し替えるときは、新しく「資料を追加」してください。</p></div>` : `
@@ -1883,6 +1917,7 @@ function renderMaterialForm(m) {
   document.getElementById('submit-btn').onclick = async () => {
     const title = document.getElementById('m-title').value.trim();
     const category = document.getElementById('m-cat').value;
+    const eventId = document.getElementById('m-event').value;
     const status = document.getElementById('m-pub').checked ? '公開' : '非公開';
     if (!title) { alert('タイトルは必須です。'); return; }
 
@@ -1891,7 +1926,7 @@ function renderMaterialForm(m) {
     if (file) {
       const btn = document.getElementById('submit-btn');
       btn.disabled = true; btn.textContent = 'アップロード中...';
-      const res = await uploadMaterialFile(file, { title, category, status });
+      const res = await uploadMaterialFile(file, { title, category, status, eventId });
       if (res.ok) { renderAdminMaterials(); }
       else { alert('アップロードに失敗しました：' + (res.error || 'unknown')); btn.disabled = false; btn.textContent = '保存'; }
       return;
@@ -1900,7 +1935,7 @@ function renderMaterialForm(m) {
     const urlEl = document.getElementById('m-url');
     const url = urlEl ? urlEl.value.trim() : '';
     if (!isFileMat && !url) { alert('ファイルを選ぶか、URLを入力してください。'); return; }
-    const payload = { title, url, category, status };
+    const payload = { title, url, category, status, eventId };
     if (m) payload.id = m.id;
     const res = await callApi('adminUpsertMaterial', payload);
     if (res.ok) { renderAdminMaterials(); }
@@ -1911,7 +1946,7 @@ function renderMaterialForm(m) {
 // 管理者によるファイルアップロード（R2へ。認証はX-Id-Tokenヘッダ）
 async function uploadMaterialFile(file, meta) {
   try {
-    const qs = new URLSearchParams({ title: meta.title, category: meta.category, status: meta.status, filename: file.name }).toString();
+    const qs = new URLSearchParams({ title: meta.title, category: meta.category, status: meta.status, filename: file.name, eventId: meta.eventId || '' }).toString();
     const res = await fetch(window.APP_CONFIG.GAS_URL.replace(/\/$/, '') + '/upload?' + qs, {
       method: 'POST',
       headers: { 'Content-Type': file.type || 'application/octet-stream', 'X-Id-Token': state.idToken },
