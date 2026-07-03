@@ -31,6 +31,7 @@ const state = {
   adminEvents: null,   // 管理: 行事一覧（編集フォーム用）
   adminFees: null,     // 管理: 会費 { fiscalYear, households, unpaidOnly }
   adminMaterials: null,// 管理: 資料一覧
+  isGuest: false,      // ゲスト（児相・共有パスコード）でログイン中か
   matView: { q: '', filter: 'all', sort: 'date' },   // 資料の絞り込み・並べ替え
   evtView: { q: '', filter: 'all', sort: 'date' },   // 行事の絞り込み・並べ替え
 };
@@ -80,6 +81,8 @@ const $app = document.getElementById('app');
 
 // ===== 起動 =====
 async function init() {
+  // ゲスト用URL（児相など）：LINEを使わず、共有パスコードで管理画面に入る
+  if (window.GUEST_MODE) return initGuest();
   try {
     await liff.init({ liffId: window.APP_CONFIG.LIFF_ID });
   } catch (e) {
@@ -150,9 +153,50 @@ function getView() {
   return 'mypage';
 }
 
+// ===== ゲスト（児相など・共有パスコード）ログイン =====
+async function initGuest() {
+  document.body.classList.add('lean');
+  let saved = null;
+  try { saved = sessionStorage.getItem('kl_guest'); } catch (e) { /* noop */ }
+  if (saved) {
+    state.idToken = 'guest:' + saved;
+    const r = await callApi('adminCheck', {});
+    if (r.ok && r.isAdmin) { state.isGuest = true; return renderAdminHome(); }
+  }
+  renderGuestLogin('');
+}
+
+function renderGuestLogin(msg) {
+  $app.innerHTML = `
+    <section class="screen">
+      <h1>${icon('lock')} ゲスト用ログイン</h1>
+      <p class="muted">さいたま市里親会 管理ページ（児童相談所むけ）。合言葉を入力してください。</p>
+      ${msg ? `<div class="card warn"><p>${escapeHtml(msg)}</p></div>` : ''}
+      <label>合言葉（パスコード）</label>
+      <input id="g-code" type="password" autocomplete="off">
+      <div class="actions"><button class="btn primary" id="g-login">入る</button></div>
+    </section>`;
+  const submit = async () => {
+    const code = document.getElementById('g-code').value.trim();
+    if (!code) { alert('合言葉を入力してください。'); return; }
+    state.idToken = 'guest:' + code;
+    const r = await callApi('adminCheck', {});
+    if (r.ok && r.isAdmin) {
+      try { sessionStorage.setItem('kl_guest', code); } catch (e) { /* noop */ }
+      state.isGuest = true; renderAdminHome();
+    } else {
+      try { sessionStorage.removeItem('kl_guest'); } catch (e) { /* noop */ }
+      renderGuestLogin('合言葉が違うようです。もう一度お試しください。');
+    }
+  };
+  document.getElementById('g-login').onclick = submit;
+  document.getElementById('g-code').addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); });
+}
+
 // マイページ（ホーム）へ戻る。最新の登録状態を取り直して表示する。
 async function goHome() {
   rememberAdmin(null); // 管理画面から離れるので記憶クリア
+  if (window.GUEST_MODE) return renderAdminHome(); // ゲストは会員マイページを持たない
   const result = await callApi('checkUser', {});
   if (result.ok && result.registered) {
     if (result.pending) return renderPending(result);
@@ -235,6 +279,7 @@ async function callApi(action, payload) {
     });
     const data = await res.json();
     if (data && data.error === 'invalid_token') {
+      if (window.GUEST_MODE) return data; // ゲストは合言葉違い→呼び出し側で処理（LINE再ログインしない）
       // トークンが弾かれた。未試行なら再ログインで取り直す（PC等の期限切れ対策）。
       if (!reauthFlagGet()) { reauthRedirect(); return await new Promise(() => {}); }
       // 再ログイン後も弾かれる＝設定不一致等。ループせずそのまま返す。
@@ -897,7 +942,7 @@ function renderDone(householdId, name) {
   `;
   document.getElementById('home-btn').onclick = goHome;
   document.getElementById('close-btn').onclick = () => {
-    if (liff.isInClient()) liff.closeWindow();
+    if (window.liff && typeof liff.isInClient === 'function' && liff.isInClient()) liff.closeWindow();
   };
 }
 
@@ -978,6 +1023,7 @@ async function renderAdmin() {
   $app.innerHTML = `<section class="screen"><h1>管理</h1><p>読み込み中...</p></section>`;
   const res = await callApi('adminCheck', {});
   if (!res.ok) return renderActionError('管理', res.error);
+  state.isGuest = !!res.isGuest;
   if (!res.isAdmin) {
     $app.innerHTML = `
       <section class="screen">
@@ -1014,12 +1060,15 @@ async function renderAdminHome() {
   $app.innerHTML = `
     <section class="screen">
       <h1>さいたま市里親会 管理メニュー</h1>
+      ${state.isGuest ? `<div class="card"><p>${icon('lock')} <strong>ゲスト（共有）で閲覧中</strong></p><p class="muted">この画面は関係者で共有されています。取り扱いにご注意ください。</p></div>` : ''}
       ${pending ? `<button class="card-btn alert-btn" id="a-pending"><strong>${icon('alert')} 承認待ちが ${pending}件あります</strong><span>タップして会員名簿で承認/却下</span></button>` : ''}
       <button class="card-btn" id="a-events"><strong>${icon('calendar')} 行事の参加者管理</strong><span>申込状況・参加費の回収・代理入力・CSV出力</span></button>
       <button class="card-btn" id="a-members"><strong>${icon('user')} 会員名簿${badge}</strong><span>世帯・個人の一覧・承認・LINEなし世帯の代理登録・CSV</span></button>
       <button class="card-btn" id="a-fees"><strong>${icon('money')} 会費の管理</strong><span>年会費の納付状況・未納一覧</span></button>
       <button class="card-btn" id="a-materials"><strong>${icon('book')} 資料の管理</strong><span>会報・しおり等の追加・公開/非公開</span></button>
-      <button class="btn back" id="home-btn" style="margin-top:24px;">‹ マイページ</button>
+      ${state.isGuest
+        ? `<button class="btn back" id="logout-btn" style="margin-top:24px;">${icon('lock')} ログアウト</button>`
+        : `<button class="btn back" id="home-btn" style="margin-top:24px;">‹ マイページ</button>`}
     </section>
   `;
   const pb = document.getElementById('a-pending');
@@ -1028,7 +1077,13 @@ async function renderAdminHome() {
   document.getElementById('a-members').onclick = renderAdminHouseholds;
   document.getElementById('a-fees').onclick = renderAdminFees;
   document.getElementById('a-materials').onclick = renderAdminMaterials;
-  document.getElementById('home-btn').onclick = goHome;
+  const hb = document.getElementById('home-btn');
+  if (hb) hb.onclick = goHome;
+  const lb = document.getElementById('logout-btn');
+  if (lb) lb.onclick = () => {
+    try { sessionStorage.removeItem('kl_guest'); } catch (e) { /* noop */ }
+    state.isGuest = false; state.idToken = null; renderGuestLogin('ログアウトしました。');
+  };
 }
 
 async function renderAdminEvents() {
@@ -2010,6 +2065,7 @@ const ICONS = {
   plus: '<path d="M12 5v14M5 12h14"/>',
   edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
   list: '<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
+  lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
 };
 function icon(name, cls) {
   const p = ICONS[name];
