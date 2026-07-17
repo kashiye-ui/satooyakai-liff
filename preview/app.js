@@ -1060,11 +1060,11 @@ async function renderAdminHome() {
   $app.innerHTML = `
     <section class="screen">
       <h1>さいたま市里親会 管理メニュー</h1>
-      ${state.isGuest ? `<div class="card"><p>${icon('lock')} <strong>ゲスト（共有）で閲覧中</strong></p><p class="muted">この画面は関係者で共有されています。取り扱いにご注意ください。</p></div>` : ''}
-      ${pending ? `<button class="card-btn alert-btn" id="a-pending"><strong>${icon('alert')} 承認待ちが ${pending}件あります</strong><span>タップして会員名簿で承認/却下</span></button>` : ''}
-      <button class="card-btn" id="a-events"><strong>${icon('calendar')} 行事の参加者管理</strong><span>申込状況・参加費の回収・代理入力・CSV出力</span></button>
-      <button class="card-btn" id="a-members"><strong>${icon('user')} 会員名簿${badge}</strong><span>世帯・個人の一覧・承認・LINEなし世帯の代理登録・CSV</span></button>
-      <button class="card-btn" id="a-fees"><strong>${icon('money')} 会費の管理</strong><span>年会費の納付状況・未納一覧</span></button>
+      ${state.isGuest ? `<div class="card"><p>${icon('lock')} <strong>ゲスト（共有）で閲覧中</strong></p><p class="muted">さいたま市児童相談所との共同利用の範囲でご利用いただけます。会費・承認・配信は当会が行います。</p></div>` : ''}
+      ${(pending && !state.isGuest) ? `<button class="card-btn alert-btn" id="a-pending"><strong>${icon('alert')} 承認待ちが ${pending}件あります</strong><span>タップして会員名簿で承認/却下</span></button>` : ''}
+      <button class="card-btn" id="a-events"><strong>${icon('calendar')} 行事の参加者管理</strong><span>${state.isGuest ? '行事の作成・編集・参加者名簿の閲覧' : '申込状況・参加費の回収・代理入力・CSV出力'}</span></button>
+      <button class="card-btn" id="a-members"><strong>${icon('user')} 会員名簿${state.isGuest ? '' : badge}</strong><span>${state.isGuest ? '世帯・個人の一覧（閲覧）' : '世帯・個人の一覧・承認・LINEなし世帯の代理登録・CSV'}</span></button>
+      ${state.isGuest ? '' : `<button class="card-btn" id="a-fees"><strong>${icon('money')} 会費の管理</strong><span>年会費の納付状況・未納一覧</span></button>`}
       <button class="card-btn" id="a-materials"><strong>${icon('book')} 資料の管理</strong><span>会報・しおり等の追加・公開/非公開</span></button>
       ${state.isGuest
         ? `<button class="btn back" id="logout-btn" style="margin-top:24px;">${icon('lock')} ログアウト</button>`
@@ -1075,7 +1075,8 @@ async function renderAdminHome() {
   if (pb) pb.onclick = renderAdminHouseholds;
   document.getElementById('a-events').onclick = renderAdminEvents;
   document.getElementById('a-members').onclick = renderAdminHouseholds;
-  document.getElementById('a-fees').onclick = renderAdminFees;
+  const fb = document.getElementById('a-fees');
+  if (fb) fb.onclick = renderAdminFees;
   document.getElementById('a-materials').onclick = renderAdminMaterials;
   const hb = document.getElementById('home-btn');
   if (hb) hb.onclick = goHome;
@@ -1135,7 +1136,7 @@ function eventAdminCard(e) {
       <div class="actions" style="margin-top:6px;">
         <button class="chip roster-btn" data-id="${escapeAttr(e.eventId)}">${icon('list')}参加者一覧</button>
         <button class="chip ev-edit" data-id="${escapeAttr(e.eventId)}">${icon('edit')}編集</button>
-        <button class="chip ev-notify" data-id="${escapeAttr(e.eventId)}">${icon('send')}LINEにて通知</button>
+        ${state.isGuest ? '' : `<button class="chip ev-notify" data-id="${escapeAttr(e.eventId)}">${icon('send')}LINEにて通知</button>`}
       </div>
     </div>`;
 }
@@ -1273,9 +1274,11 @@ function drawAdminRoster() {
       <td class="num">${r.adultCount}</td><td class="num">${r.childCount}</td>
       <td class="num">${r.total > 0 ? r.total.toLocaleString() : '—'}</td>
       <td>${r.total > 0
-        ? `<button class="chip ${r.payStatus === '済' ? 'on' : 'off'} pay-toggle" data-id="${escapeAttr(r.householdId)}">${r.payStatus === '済' ? '済' : '未'}</button>`
+        ? (state.isGuest
+            ? `<span class="st ${r.payStatus === '済' ? 'st-ok' : 'st-todo'}">${icon(r.payStatus === '済' ? 'check' : 'alert')}${r.payStatus === '済' ? '済' : '未'}</span>`
+            : `<button class="chip ${r.payStatus === '済' ? 'on' : 'off'} pay-toggle" data-id="${escapeAttr(r.householdId)}">${r.payStatus === '済' ? '済' : '未'}</button>`)
         : '<span class="muted">—</span>'}</td>
-      <td><button class="chip edit-att" data-id="${escapeAttr(r.householdId)}">編集</button></td>
+      <td>${state.isGuest ? '' : `<button class="chip edit-att" data-id="${escapeAttr(r.householdId)}">編集</button>`}</td>
     </tr>`).join('');
 
   $app.innerHTML = `
@@ -1292,17 +1295,18 @@ function drawAdminRoster() {
           <thead><tr>${sortTh('区', 'ku', view)}${sortTh('世帯代表者', 'rep', view)}${sortTh('大人', 'adult', view)}${sortTh('子', 'child', view)}${sortTh('参加費', 'total', view)}${sortTh('支払', 'pay', view)}<th></th></tr></thead>
           <tbody>${trs}</tbody>
         </table></div>
-        <p class="hint">見出しクリックで並べ替え。「支払」の済/未はタップで切替。${hasFee ? '' : 'この行事は参加費が無料です。'}</p>
+        <p class="hint">見出しクリックで並べ替え。${state.isGuest ? '' : '「支払」の済/未はタップで切替。'}${hasFee ? '' : 'この行事は参加費が無料です。'}</p>
         <button class="btn primary" id="csv-btn" style="margin-top:8px;">CSVをダウンロード（全件）</button>
         <p class="hint">ダウンロードはPCのブラウザ推奨です。</p>
       ` : '<p class="muted">該当する回答がありません。</p>'}
-      <button class="btn" id="proxy-btn" style="margin-top:8px;">LINEなし世帯を代理で入力</button>
+      ${state.isGuest ? '' : '<button class="btn" id="proxy-btn" style="margin-top:8px;">LINEなし世帯を代理で入力</button>'}
       <button class="btn back" id="back-btn" style="margin-top:8px;">‹ 行事一覧</button>
     </section>
   `;
   document.getElementById('topback').onclick = renderAdminEvents;
   document.getElementById('back-btn').onclick = renderAdminEvents;
-  document.getElementById('proxy-btn').onclick = () => renderProxyHouseholdPicker(eventId, event);
+  const proxyBtn = document.getElementById('proxy-btn');
+  if (proxyBtn) proxyBtn.onclick = () => renderProxyHouseholdPicker(eventId, event);
   wireTableControls(view, drawAdminRoster);
 
   document.querySelectorAll('button.pay-toggle').forEach(b => {
@@ -1445,12 +1449,14 @@ function drawAdminMembers() {
   const adminCell = (m) => {
     const isLine = m.lineUserId && String(m.lineUserId).indexOf('U') === 0;
     if (m.isFixedAdmin) return '<span class="chip on" style="pointer-events:none;">固定</span>';
+    if (state.isGuest) return m.isAdmin ? '<span class="muted">管理者</span>' : '<span class="muted">—</span>';
     if (isLine) return `<button class="chip ${m.isAdmin ? 'on' : ''} admin-toggle" data-uid="${escapeAttr(m.lineUserId)}" data-on="${m.isAdmin ? '1' : '0'}" data-name="${escapeAttr(m.name)}">${m.isAdmin ? '管理者' : '管理者にする'}</button>`;
     return '<span class="muted">—</span>';
   };
   const statusCell = (r) => {
     if (!r.m) return '';
     if (r.status === '承認待ち') {
+      if (state.isGuest) return statusBadge('hold', '承認待ち');
       return `<span style="white-space:nowrap;">承認待ち<br><button class="chip on approve-btn" data-uid="${escapeAttr(r.m.lineUserId)}" data-name="${escapeAttr(r.name)}">承認</button> <button class="chip off reject-btn" data-uid="${escapeAttr(r.m.lineUserId)}" data-name="${escapeAttr(r.name)}">却下</button></span>`;
     }
     return r.status !== '有効' ? '<span class="muted">' + escapeHtml(r.status) + '</span>' : '有効';
@@ -1464,7 +1470,7 @@ function drawAdminMembers() {
       <td>${escapeHtml(r.fee)}</td>
       <td>${statusCell(r)}</td>
       <td>${r.m ? adminCell(r.m) : ''}</td>
-      <td>${r.isRep ? `<button class="chip add-member" data-hid="${escapeAttr(r.householdId)}" data-label="${escapeAttr(r.ku + ' ' + r.rep)}">＋家族</button>` : ''}</td>
+      <td>${(r.isRep && !state.isGuest) ? `<button class="chip add-member" data-hid="${escapeAttr(r.householdId)}" data-label="${escapeAttr(r.ku + ' ' + r.rep)}">＋家族</button>` : ''}</td>
     </tr>`;
 
   $app.innerHTML = `
@@ -1474,7 +1480,7 @@ function drawAdminMembers() {
       <p class="muted">${hs.length}世帯・${memberCount}名${pendingCount ? ` ／ <strong style="color:var(--pink);">承認待ち ${pendingCount}件</strong>` : ''}${view.q ? `（表示 ${shown.length}行）` : ''}</p>
       <div class="toolbar">
         <input class="search-input" id="tbl-search" type="search" placeholder="区・氏名・里親種別などで検索…" value="${escapeAttr(view.q)}">
-        <button class="btn" id="new-h-btn" style="flex:0 0 auto;">＋ LINEなし世帯を登録</button>
+        ${state.isGuest ? '' : '<button class="btn" id="new-h-btn" style="flex:0 0 auto;">＋ LINEなし世帯を登録</button>'}
       </div>
       ${shown.length ? `
         <div class="tbl-wrap"><table class="tbl">
@@ -1491,7 +1497,8 @@ function drawAdminMembers() {
   `;
   document.getElementById('topback').onclick = renderAdminHome;
   document.getElementById('back-btn').onclick = renderAdminHome;
-  document.getElementById('new-h-btn').onclick = renderProxyNewHousehold;
+  const newHBtn = document.getElementById('new-h-btn');
+  if (newHBtn) newHBtn.onclick = renderProxyNewHousehold;
   wireTableControls(view, drawAdminMembers);
   document.querySelectorAll('button.add-member').forEach(b => {
     b.onclick = () => renderProxyAddMember({ householdId: b.dataset.hid, label: b.dataset.label });
@@ -1629,6 +1636,9 @@ function renderProxyAddMember(hh) {
 
 // ===== 管理: 会費の管理 =====
 async function renderAdminFees() {
+  document.body.classList.add('lean');
+  // 会費は当会に留保（児相との共同利用の範囲外）。ゲストは開けない。
+  if (state.isGuest) return renderActionError('会費の管理', 'この画面は当会（里親会）専用です。');
   rememberAdmin('fees');
   $app.innerHTML = `<section class="screen"><h1>会費の管理</h1><p>読み込み中...</p></section>`;
   const res = await callApi('adminListHouseholds', {});
@@ -1729,7 +1739,7 @@ function materialCard(m) {
       <div class="actions" style="margin-top:6px;">
         <button class="chip ${isPub ? 'on' : 'off'} mat-toggle" data-id="${escapeAttr(m.id)}">${icon(isPub ? 'check' : 'ban')}${isPub ? '公開中' : '非公開'}</button>
         <button class="chip mat-edit" data-id="${escapeAttr(m.id)}">${icon('edit')}編集</button>
-        <button class="chip mat-notify" data-id="${escapeAttr(m.id)}">${icon('send')}LINEにて通知</button>
+        ${state.isGuest ? '' : `<button class="chip mat-notify" data-id="${escapeAttr(m.id)}">${icon('send')}LINEにて通知</button>`}
       </div>
     </div>`;
 }
