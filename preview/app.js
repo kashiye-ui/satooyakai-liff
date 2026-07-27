@@ -16,7 +16,7 @@ const JOIN_ROLES = ['配偶者', '子ども', '同居家族', 'その他'];
 
 // 同意取得時の文書バージョン（terms.html / privacy.html の版と一致させること）
 const TERMS_VERSION = 'v0.2';
-const PRIVACY_VERSION = 'v0.2';
+const PRIVACY_VERSION = 'v0.3';
 
 const state = {
   profile: null,
