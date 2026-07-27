@@ -764,7 +764,11 @@ async function submitNewHousehold() {
     },
   });
   if (result.ok) {
-    renderDone(result.householdId, fullName);
+    renderDone({
+      householdId: result.householdId, name: fullName, role: '世帯代表者',
+      repName: fullName, ku: h.ku, phone: h.phone, fosterType: h.fosterType,
+      notified: !!result.notified,
+    });
   } else if (result.error === 'duplicate_household') {
     renderDuplicateConfirm(result.existing);
   } else {
@@ -927,25 +931,48 @@ async function submitJoinMember() {
     consent: { termsVersion: TERMS_VERSION, privacyVersion: PRIVACY_VERSION },
   });
   if (result.ok) {
-    renderDone(state.joinHousehold.householdId, fullName);
+    const jh = state.joinHousehold || {};
+    renderDone({
+      householdId: jh.householdId, name: fullName, role,
+      repName: jh.representativeName || '', ku: jh.ku || '',
+      notified: !!result.notified,
+    });
   } else {
     alert('登録に失敗しました: ' + (result.error || 'unknown'));
   }
 }
 
 // ===== 画面: 完了 =====
-function renderDone(householdId, name) {
+// d = { householdId, name, role, repName, ku, phone, fosterType, notified }
+// 登録内容をそのまま並べて誤字に気づけるようにする。同じ控えを本人のLINEトークにも送っている。
+function renderDone(d) {
+  const row = (label, value) => value ? `<p><span class="muted">${label}</span>　${escapeHtml(value)}</p>` : '';
   $app.innerHTML = `
     <section class="screen">
       <h1>登録を受け付けました</h1>
-      <p>さいたま市里親会へようこそ。</p>
+      <p>さいたま市里親会へようこそ。次の内容で承りました。</p>
       <div class="card">
-        <p><strong>${escapeHtml(name)}</strong> さん</p>
-        <p>世帯ID: ${escapeHtml(householdId)}</p>
+        <p><strong>${icon('user')} ご本人</strong></p>
+        ${row('お名前', d.name)}
+        ${row('立場', d.role)}
+      </div>
+      <div class="card">
+        <p><strong>${icon('admin')} 世帯</strong></p>
+        ${row('世帯ID', d.householdId)}
+        ${row('世帯代表者', d.repName)}
+        ${row('お住まいの区', d.ku)}
+        ${row('連絡先', d.phone)}
+        ${row('里親種別', d.fosterType)}
+      </div>
+      <div class="card">
+        <p>${d.notified
+          ? `${statusBadge('ok', '控えを送信')} 同じ内容を、この公式アカウントのトークにお送りしました。`
+          : `${statusBadge('hold', '控えは未送信')} トークへの控えをお送りできませんでした。この公式アカウントを<strong>友だち追加</strong>していただくと、次回からお受け取りいただけます。内容はこの画面でご確認ください。`}</p>
       </div>
       <div class="card warn">
         <p>ご利用には<strong>運営（理事）の承認</strong>が必要です。承認されると、イベントや資料をご利用いただけるようになります。</p>
       </div>
+      <p class="muted">内容に誤りがあるときは、公式アカウントのトークにご返信ください。</p>
       <p class="muted">ご家族の方も、同じ手順で「家族として参加」からご登録いただけます。</p>
       <div class="actions">
         <button class="btn" id="home-btn">状態を確認</button>
@@ -1534,10 +1561,14 @@ function drawAdminMembers() {
   });
   document.querySelectorAll('button.approve-btn').forEach(b => {
     b.onclick = async () => {
-      if (!confirm(`${b.dataset.name} さんを承認します（利用開始）。よろしいですか？`)) return;
+      if (!confirm(`${b.dataset.name} さんを承認します（利用開始）。ご本人のLINEに承認のお知らせが届きます。よろしいですか？`)) return;
       b.disabled = true;
       const resp = await callApi('adminApproveMember', { targetUserId: b.dataset.uid, approve: true });
-      if (resp.ok) { renderAdminHouseholds(); }
+      if (resp.ok) {
+        // 通知が届かない相手（公式アカウントを友だち追加していない等）は運営が気づけるように伝える
+        if (!resp.notified) alert(`${b.dataset.name} さんを承認しました。\n\nただし、LINEでのお知らせは届きませんでした（公式アカウントを友だち追加されていない可能性があります）。必要でしたら個別にご連絡ください。`);
+        renderAdminHouseholds();
+      }
       else { alert('承認に失敗しました：' + (resp.error || 'unknown')); b.disabled = false; }
     };
   });
