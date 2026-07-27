@@ -422,7 +422,8 @@ async function renderEvents() {
   state.events = res.events || [];
 
   const open = state.events.filter(e => e.status === '募集中');
-  const past = state.events.filter(e => e.status !== '募集中');
+  const waiting = state.events.filter(e => e.status === '開催待');   // 締切済み・開催はこれから
+  const past = state.events.filter(e => e.status !== '募集中' && e.status !== '開催待');
 
   // ひもづいた資料（案内・しおり等）をタップで開ける導線に
   const eventDocs = (e) => (e.materials && e.materials.length)
@@ -441,6 +442,17 @@ async function renderEvents() {
       <button class="btn primary act" data-id="${escapeAttr(e.eventId)}">${e.myResponse ? '回答を変更する' : '出欠を回答する'}</button>`}
     </div>`;
 
+  // 締切後～開催まで。申込ボタンは出さず、自分の回答と資料だけ見られるようにする。
+  const waitingCard = (e) => `
+    <div class="card">
+      <p><strong>${escapeHtml(e.name)}</strong> ${statusBadge('hold', '申込締切')}</p>
+      <p class="muted">${escapeHtml(e.date)}${e.place ? ' ／ ' + escapeHtml(e.place) : ''}</p>
+      ${eventDocs(e)}
+      ${e.myResponse
+        ? `<p>${statusBadge('ok', '回答済み')} 大人 ${e.myResponse.adultCount}名・子ども ${e.myResponse.childCount}名${e.myResponse.total > 0 ? '（参加費 ' + e.myResponse.total.toLocaleString() + '円）' : ''}</p>`
+        : '<p class="muted">お申し込みの受付は終了しました。</p>'}
+    </div>`;
+
   const pastCard = (e) => `
     <div class="card">
       <p><strong>${escapeHtml(e.name)}</strong> ${statusBadge(eventStatusKind(e.status), e.status)}</p>
@@ -456,6 +468,7 @@ async function renderEvents() {
       <h1>行事・申込</h1>
       <h2 class="sub">受付中の行事</h2>
       ${open.length ? open.map(openCard).join('') : '<p class="muted">現在、受付中の行事はありません。</p>'}
+      ${waiting.length ? `<h2 class="sub">開催予定（申込は締切）</h2>${waiting.map(waitingCard).join('')}` : ''}
       ${past.length ? `<h2 class="sub">過去の行事</h2>${past.map(pastCard).join('')}` : ''}
       <button class="btn back" id="home-btn" style="margin-top:24px;">‹ マイページ</button>
     </section>
@@ -1101,6 +1114,7 @@ async function renderAdminEvents() {
     filters: [
       { key: 'all', label: 'すべて' },
       { key: '募集中', label: '募集中' },
+      { key: '開催待', label: '開催待' },
       { key: '開催済', label: '開催済' },
       { key: '中止', label: '中止' },
     ],
@@ -1163,7 +1177,8 @@ function paintAdminEvents() {
   });
 }
 
-const EVENT_STATUSES = ['募集中', '開催済', '中止'];
+// 開催待＝申込は締め切ったが開催はこれから。会員の申込は止まり、代理入力だけできる。
+const EVENT_STATUSES = ['募集中', '開催待', '開催済', '中止'];
 const EVENT_TARGETS = ['全員', '会員のみ'];
 
 function renderEventForm(ev) {
@@ -1200,6 +1215,7 @@ function renderEventForm(ev) {
       <p class="hint">「案内のみ」にすると出欠ボタンを出さず、ひもづけた案内（資料）だけを表示します。</p>
       <label>ステータス</label>
       <select id="ev-status">${EVENT_STATUSES.map(s => `<option ${c.status === s ? 'selected' : ''}>${s}</option>`).join('')}</select>
+      <p class="hint">「開催待」＝申込は締め切ったが開催はこれから。会員の申込ボタンは消えますが、参加者一覧・資料は見られ、管理者の代理入力はできます。</p>
       <label>備考</label>
       <input id="ev-note" value="${escapeAttr(c.note)}">
       <div class="actions">
@@ -1936,7 +1952,7 @@ function isNewByDate(publishedAt) {
   return (Date.now() - t) <= NEW_DAYS * 24 * 3600 * 1000 && (Date.now() - t) >= -2 * 24 * 3600 * 1000;
 }
 function newBadge() { return `<span class="newbadge">NEW</span>`; }
-// 資料がNEW＝直近31日に登録 または ひもづく行事が募集中（終了で自動的に消える）
+// 資料がNEW＝直近31日に登録 または ひもづく行事がこれから（募集中・開催待。終了で自動的に消える）
 function isNewMaterial(m) { return isNewByDate(m && m.publishedAt) || !!(m && m.eventOpen); }
 
 function renderMaterialForm(m) {
@@ -1959,7 +1975,7 @@ function renderMaterialForm(m) {
         <option value="">（なし）</option>
         ${(state.adminEvents || []).map(e => `<option value="${escapeAttr(e.eventId)}" ${cur.eventId === e.eventId ? 'selected' : ''}>${escapeHtml(e.name)}（${escapeHtml(e.date || '')}）</option>`).join('')}
       </select>
-      <p class="hint">行事にひもづけると、その行事一覧にも資料が表示され、募集中の間は「NEW」が付きます。行事側は「行事の管理」で作成できます。</p>
+      <p class="hint">行事にひもづけると、その行事一覧にも資料が表示され、行事が終わるまでは「NEW」が付きます。行事側は「行事の管理」で作成できます。</p>
       ${isFileMat ? `
       <div class="card"><p>アップロード済みファイル：<strong>${escapeHtml(cur.note || cur.title)}</strong></p>
       <p class="muted">差し替えるときは、新しく「資料を追加」してください。</p></div>` : `
