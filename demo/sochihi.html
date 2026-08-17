@@ -1,0 +1,1247 @@
+<title>措置費 受付デモ</title>
+<meta name="robots" content="noindex, nofollow">
+<script>
+/* このファイルは単体でも配れるようにしている。単体だと <meta name="viewport"> が無く、
+   スマホが幅980pxで描画して全体を縮小してしまう（＝文字が小さくて読めない）ので、
+   無い場合だけ実行時に補う。ホスティング側が既に入れている場合は何もしない。 */
+(function(){
+  if (document.querySelector('meta[name="viewport"]')) return;
+  var m = document.createElement('meta');
+  m.name = 'viewport';
+  m.content = 'width=device-width,initial-scale=1';
+  (document.head || document.documentElement).appendChild(m);
+})();
+</script>
+<style>
+  :root{
+    --ground:#e9edf1; --surface:#ffffff; --surface-2:#f4f6f9;
+    --line:#c9d3dd; --line-soft:#dde4ec;
+    --ink:#141d26; --ink-2:#41505f; --ink-3:#5b6875;
+    --ai:#16456b; --ai-soft:#e3ecf4;
+    --shu:#b8372b; --shu-soft:#f7e5e2;
+    --ok:#2c6b4f; --ok-soft:#e0efe7;
+    --warn:#8a5a06; --warn-soft:#f8ecd6;
+    /* アクセント色の上に乗る文字色。テーマごとに .btn を上書きすると .btn.ghost に
+       詳細度で勝ってしまうので、必ずこのトークン経由で色を付ける。 */
+    --on-ai:#ffffff; --on-shu:#ffffff;
+    --paper:#ffffff; --paper-ink:#1a2029; --paper-line:#b9c4cf; --paper-shu:#a8332a;
+    --shadow:0 1px 2px rgba(20,29,38,.06), 0 8px 24px -16px rgba(20,29,38,.35);
+    --mono:"SFMono-Regular",Consolas,"Roboto Mono","BIZ UDGothic",monospace;
+    --gothic:"Hiragino Kaku Gothic ProN","Yu Gothic UI","Yu Gothic","Noto Sans JP","Meiryo",system-ui,sans-serif;
+    --mincho:"Hiragino Mincho ProN","Yu Mincho","YuMincho","Noto Serif JP","MS PMincho",serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --ground:#10151a; --surface:#171e25; --surface-2:#1e262e;
+      --line:#33414e; --line-soft:#27313a;
+      --ink:#e7edf3; --ink-2:#b3c0cc; --ink-3:#8395a4;
+      --ai:#7fb2dd; --ai-soft:#1b2c3b;
+      --shu:#e08279; --shu-soft:#33201e;
+      --on-ai:#0d1519; --on-shu:#1a0f0e;
+      --ok:#77c9a2; --ok-soft:#162b23;
+      --warn:#dcae5c; --warn-soft:#2c2415;
+      --paper:#e8eaec; --paper-ink:#161c24; --paper-line:#9aa5b1; --paper-shu:#a8332a;
+      --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.9);
+    }
+  }
+  :root[data-theme="dark"]{
+    --ground:#10151a; --surface:#171e25; --surface-2:#1e262e;
+    --line:#33414e; --line-soft:#27313a;
+    --ink:#e7edf3; --ink-2:#b3c0cc; --ink-3:#8395a4;
+    --ai:#7fb2dd; --ai-soft:#1b2c3b;
+    --shu:#e08279; --shu-soft:#33201e;
+    --on-ai:#0d1519; --on-shu:#1a0f0e;
+    --ok:#77c9a2; --ok-soft:#162b23;
+    --warn:#dcae5c; --warn-soft:#2c2415;
+    --paper:#e8eaec; --paper-ink:#161c24; --paper-line:#9aa5b1; --paper-shu:#a8332a;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.9);
+  }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--gothic);
+       font-size:16px;line-height:1.8;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
+  .wrap{max-width:900px;margin:0 auto;padding:0 16px 80px}
+  @media (min-width:700px){ .wrap{padding:0 24px 96px} }
+  h1,h2,h3{font-family:var(--mincho);font-weight:600;text-wrap:balance;letter-spacing:.02em;margin:0}
+  h1{font-size:clamp(24px,5.6vw,38px);line-height:1.35}
+  h2{font-size:clamp(20px,4.4vw,26px);line-height:1.45}
+  h3{font-size:clamp(16px,3.6vw,18px);line-height:1.5}
+  p{margin:0}
+  a{color:var(--ai)}
+
+  .banner{background:var(--shu-soft);color:var(--shu);
+    border-bottom:1px solid color-mix(in srgb,var(--shu) 30%,transparent);
+    font-size:12.5px;letter-spacing:.02em;padding:9px 16px;text-align:center;font-weight:700;line-height:1.6}
+
+  header.top{padding:36px 0 26px;border-bottom:1px solid var(--line);margin-bottom:30px}
+  .eyebrow{font-size:11.5px;letter-spacing:.16em;color:var(--ai);font-weight:700;
+    margin-bottom:12px;display:flex;align-items:center;gap:10px}
+  .eyebrow::after{content:"";flex:1;height:1px;background:var(--line)}
+  .lede{margin-top:16px;color:var(--ink-2);font-size:15.5px}
+  .howto{margin-top:16px;background:var(--ai-soft);border-radius:8px;padding:13px 15px;
+    font-size:14px;color:var(--ink-2);border:1px solid color-mix(in srgb,var(--ai) 25%,transparent)}
+  .howto b{color:var(--ink)}
+
+  section{margin-bottom:44px}
+  .sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+  .sec-no{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);
+    border:1px solid var(--line);border-radius:3px;padding:1px 7px;flex:none}
+  .sec-sub{color:var(--ink-2);margin:8px 0 20px;font-size:15px}
+  .card{background:var(--surface);border:1px solid var(--line-soft);border-radius:8px;box-shadow:var(--shadow)}
+
+  .facts{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line-soft);
+    border:1px solid var(--line-soft);border-radius:8px;overflow:hidden}
+  @media (min-width:700px){ .facts{grid-template-columns:repeat(5,1fr)} }
+  .fact{background:var(--surface);padding:14px 15px}
+  .fact dt{font-size:12px;color:var(--ink-3);letter-spacing:.04em;margin-bottom:2px}
+  .fact dd{margin:0;font-size:23px;font-family:var(--mincho);font-variant-numeric:tabular-nums;line-height:1.25}
+  .fact dd small{font-size:12.5px;font-family:var(--gothic);color:var(--ink-2);margin-left:3px}
+
+  .flow{display:flex;flex-direction:column;gap:12px}
+  .step{background:var(--surface);border:1px solid var(--line-soft);border-radius:9px;
+    padding:16px 15px;box-shadow:var(--shadow);scroll-margin-top:14px}
+  @media (min-width:700px){ .step{padding:20px 22px} }
+  .shead{display:flex;gap:11px;align-items:flex-start;margin-bottom:12px}
+  .stepno{flex:none;width:25px;height:25px;border-radius:50%;background:var(--ai);color:var(--on-ai);
+    display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;
+    font-family:var(--mono);margin-top:2px}
+  .shead h3{margin-bottom:1px}
+  .shead .sd{font-size:13px;color:var(--ink-3);line-height:1.6}
+  .arrow{text-align:center;color:var(--ink-3);font-size:20px;line-height:1;margin:-4px 0}
+
+  .phone{border:1px solid var(--line);border-radius:16px;background:var(--surface-2);
+    padding:8px;max-width:340px;margin:0 auto}
+  .phone-bar{background:var(--ai);color:var(--on-ai);border-radius:9px 9px 0 0;padding:8px 13px;
+    font-size:12.5px;font-weight:700;letter-spacing:.02em;display:flex;justify-content:space-between}
+  .phone-body{background:var(--surface);border-radius:0 0 9px 9px;padding:12px;
+    display:flex;flex-direction:column;gap:10px}
+  .steplabel{font-size:11.5px;letter-spacing:.08em;color:var(--ink-3);font-weight:700}
+
+  .fld{display:flex;flex-direction:column;gap:3px;font-size:12px}
+  .fld > span{color:var(--ink-3)}
+  .fld input,.fld select{font:inherit;font-size:16px;padding:8px 9px;border:1px solid var(--line);
+    border-radius:6px;background:var(--surface);color:var(--ink);width:100%}
+  .fld input:focus-visible,.fld select:focus-visible{outline:2px solid var(--ai);outline-offset:1px}
+  .itemrow{display:grid;grid-template-columns:1fr 90px;gap:6px}
+  .daygrid{display:grid;grid-template-columns:repeat(8,1fr);gap:4px}
+  .day{font:inherit;font-size:12px;text-align:center;padding:6px 0;border-radius:50%;cursor:pointer;
+    color:var(--ink-3);font-variant-numeric:tabular-nums;background:transparent;border:1px solid transparent}
+  .day:hover{border-color:var(--line)}
+  .day[aria-pressed="true"]{background:var(--shu);color:var(--on-shu);font-weight:700}
+
+  .calcbox{background:var(--ai-soft);border:1px dashed color-mix(in srgb,var(--ai) 40%,transparent);
+    border-radius:6px;padding:10px 11px;font-size:12.5px;color:var(--ink-2)}
+  .calcline{display:flex;justify-content:space-between;gap:8px;font-variant-numeric:tabular-nums}
+  .calcline b{color:var(--ink)}
+  .calctotal{display:flex;justify-content:space-between;align-items:baseline;
+    border-top:1px solid color-mix(in srgb,var(--ai) 30%,transparent);margin-top:6px;padding-top:6px}
+  .calctotal b{font-family:var(--mincho);font-size:20px;color:var(--ai);font-variant-numeric:tabular-nums}
+  .flag{border-radius:6px;padding:8px 10px;font-size:12.5px;line-height:1.65}
+  .flag.ng{background:var(--shu-soft);color:var(--shu)}
+  .flag.info{background:var(--warn-soft);color:var(--warn)}
+  .flag.good{background:var(--ok-soft);color:var(--ok)}
+  .btn{font:inherit;font-size:15px;font-weight:700;border-radius:7px;cursor:pointer;
+    padding:11px 14px;border:1px solid var(--ai);background:var(--ai);color:var(--on-ai);width:100%}
+  .btn.ghost{background:transparent;color:var(--ai)}
+  .btn.sm{font-size:13px;padding:8px 12px;width:auto}
+  .btn:focus-visible{outline:2px solid var(--ai);outline-offset:2px}
+  .toast{background:var(--ok-soft);color:var(--ok);border-radius:7px;padding:11px 13px;
+    font-size:13.5px;font-weight:700;line-height:1.6}
+
+  .a4bar{display:flex;justify-content:space-between;align-items:center;gap:10px;
+    flex-wrap:wrap;margin-bottom:10px;font-size:12.5px;color:var(--ink-3)}
+  .a4box{background:var(--surface-2);border:1px solid var(--line-soft);border-radius:8px;
+    padding:12px;overflow:hidden;position:relative}
+  .a4box[data-full="1"]{overflow:auto;max-height:70vh}
+  .a4fit{width:794px;transform-origin:top left}
+  .a4{width:794px;min-height:1123px;background:var(--paper);color:var(--paper-ink);
+    border:1px solid var(--paper-line);box-shadow:0 2px 14px rgba(0,0,0,.16);
+    padding:76px 68px;font-size:14px;line-height:1.85}
+  .a4 .a4-form{font-family:var(--mono);font-size:12px;letter-spacing:.08em}
+  .a4 .a4-title{font-family:var(--mincho);font-size:21px;text-align:center;letter-spacing:.24em;margin:22px 0 11px}
+  .a4 .a4-to{font-size:13px;margin-bottom:30px}
+  /* 単体ファイルはDOCTYPEが無く互換モードで描画される。互換モードの table は親から
+     色・フォントを継承しないため、表の中では必ず明示する（用紙は常に白系）。 */
+  .a4 table{width:100%;border-collapse:collapse;color:var(--paper-ink);
+    font-family:var(--gothic);font-size:14px;line-height:1.85}
+  .a4 th,.a4 td{border:1px solid var(--paper-line);padding:10px 11px;vertical-align:top;
+    font-weight:400;text-align:left;color:var(--paper-ink);font-size:13.5px}
+  .a4 th{width:144px;background:color-mix(in srgb,var(--paper-line) 22%,transparent);font-size:13px}
+  .a4 td{font-variant-numeric:tabular-nums}
+  .a4 .a4-total{display:flex;justify-content:flex-end;gap:30px;align-items:baseline;
+    margin-top:22px;font-family:var(--mincho);font-size:19px;font-variant-numeric:tabular-nums}
+  .a4 .a4-foot{display:flex;justify-content:space-between;align-items:flex-end;margin-top:45px;font-size:13px}
+  .a4 .a4-note{margin-top:30px;font-size:11.5px;color:color-mix(in srgb,var(--paper-ink) 65%,transparent)}
+  /* 印は常に白い用紙の上に載るので、テーマで色を変えない */
+  .seal{display:inline-flex;align-items:center;justify-content:center;width:60px;height:60px;
+    border:2px solid var(--paper-shu);color:var(--paper-shu);border-radius:50%;
+    font-size:10px;line-height:1.2;text-align:center;font-family:var(--mincho)}
+
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+  .chip{display:inline-flex;align-items:baseline;gap:6px;border:1px solid var(--line-soft);
+    border-radius:999px;padding:4px 11px;font-size:12.5px;background:var(--surface-2)}
+  .chip b{font-size:15px;font-variant-numeric:tabular-nums;font-family:var(--mincho)}
+  .chip.is-ng{background:var(--shu-soft);border-color:color-mix(in srgb,var(--shu) 35%,transparent);color:var(--shu)}
+  .chip.is-ok{background:var(--ok-soft);border-color:color-mix(in srgb,var(--ok) 35%,transparent);color:var(--ok)}
+  .chip.is-mid{background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 35%,transparent);color:var(--warn)}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;font-size:13px}
+  .filters label{display:inline-flex;align-items:center;gap:5px;color:var(--ink-2)}
+  select,input[type="number"],input[type="search"],input[type="text"]{font:inherit;font-size:16px;
+    padding:7px 9px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink)}
+  select:focus-visible,input:focus-visible{outline:2px solid var(--ai);outline-offset:1px}
+  .tablewrap{border:1px solid var(--line-soft);border-radius:7px;max-height:400px;overflow:auto}
+  table.data{border-collapse:collapse;width:100%;font-size:13px}
+  table.data thead th{position:sticky;top:0;background:var(--surface-2);z-index:1;text-align:left;
+    font-weight:700;color:var(--ink-2);font-size:12px;letter-spacing:.02em;
+    padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+  table.data tbody td{padding:8px 10px;border-bottom:1px solid var(--line-soft);vertical-align:top;
+    color:var(--ink);font-size:13px;font-family:var(--gothic)}
+  table.data tbody tr{cursor:pointer}
+  table.data tbody tr:hover{background:var(--surface-2)}
+  table.data tbody tr.sel{background:var(--ai-soft)}
+  table.data tbody tr.sel:hover{background:var(--ai-soft)}
+  td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  td.id{font-family:var(--mono);font-size:11.5px;color:var(--ink-3);white-space:nowrap}
+  .pill{display:inline-block;border-radius:4px;padding:1px 8px;font-size:11.5px;font-weight:700;white-space:nowrap}
+  .p-ok{background:var(--ok-soft);color:var(--ok)}
+  .p-mid{background:var(--warn-soft);color:var(--warn)}
+  .p-ng{background:var(--shu-soft);color:var(--shu)}
+  .p-new{background:var(--ai-soft);color:var(--ai)}
+  .src{font-size:11.5px;color:var(--ink-3)}
+  .why{color:var(--shu);font-size:12px;display:block;margin-top:2px}
+
+  @media (max-width:719px){
+    .tablewrap{max-height:none;border:0;border-radius:0;overflow:visible}
+    table.data thead{display:none}
+    table.data,table.data tbody,table.data tr,table.data td{display:block}
+    table.data tbody tr{border:1px solid var(--line-soft);border-radius:8px;
+      margin-bottom:8px;padding:8px 11px;background:var(--surface)}
+    table.data tbody td{border:0;padding:3px 0;display:flex;justify-content:space-between;
+      gap:12px;text-align:right}
+    table.data tbody td::before{content:attr(data-l);color:var(--ink-3);font-size:11.5px;
+      text-align:left;flex:none;font-weight:400}
+    /* スマホのカードは要点だけ。受付番号・児童・様式は下の「申請の中身」で見える */
+    table.data tbody td:nth-child(1),
+    table.data tbody td:nth-child(3),
+    table.data tbody td:nth-child(5){display:none}
+  }
+
+  .proxy{border:1px dashed var(--line);border-radius:8px;padding:12px 13px;margin-bottom:14px;background:var(--surface-2)}
+  .proxy-head{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:14px}
+  .pgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+  .badge-proxy{display:inline-block;background:var(--warn-soft);color:var(--warn);border-radius:3px;
+    padding:0 6px;font-size:11px;font-weight:700;margin-left:5px}
+
+  .detail{border:1px solid var(--line-soft);border-radius:8px;padding:14px;background:var(--surface-2);
+    scroll-margin-top:14px}
+  .detail .dhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  .detail .dhead b{font-family:var(--mono);font-size:11.5px;color:var(--ink-3)}
+  .dl{margin:10px 0;font-size:13px}
+  .dl > div{display:flex;gap:10px;border-bottom:1px dotted var(--line-soft);padding:5px 0}
+  .dl dt{flex:0 0 80px;color:var(--ink-3);margin:0;font-size:12.5px}
+  .dl dd{margin:0;flex:1;font-variant-numeric:tabular-nums;text-align:right}
+  .actions{display:flex;flex-direction:column;gap:7px;margin-top:12px}
+  .empty{color:var(--ink-3);font-size:13.5px;padding:6px 0}
+  .payline{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;
+    background:var(--surface-2);border-radius:8px;padding:13px 15px}
+  .payline .sum{font-size:13.5px;color:var(--ink-2)}
+  .payline .sum b{font-family:var(--mincho);font-size:21px;font-variant-numeric:tabular-nums;color:var(--ai)}
+  .payline .btn{width:100%}
+  @media (min-width:700px){ .payline .btn{width:auto} }
+
+  .cases{display:grid;grid-template-columns:1fr;gap:10px}
+  @media (min-width:700px){ .cases{grid-template-columns:1fr 1fr} }
+  .case{border:1px solid var(--line-soft);border-radius:8px;padding:13px 15px;background:var(--surface)}
+  .case .q{font-weight:700;font-size:14.5px;margin-bottom:5px}
+  .case .a{font-size:13.5px;color:var(--ink-2);margin-bottom:7px}
+  .case .meta{font-size:11.5px;color:var(--ink-3);display:flex;gap:10px;flex-wrap:wrap;
+    border-top:1px dotted var(--line-soft);padding-top:6px}
+  .verdict{display:inline-block;font-size:11px;font-weight:700;border-radius:3px;padding:1px 7px;margin-right:6px}
+  .v-no{background:var(--shu-soft);color:var(--shu)}
+  .v-yes{background:var(--ok-soft);color:var(--ok)}
+  .v-ask{background:var(--warn-soft);color:var(--warn)}
+
+  .calc{display:grid;grid-template-columns:1fr;gap:16px}
+  @media (min-width:820px){ .calc{grid-template-columns:minmax(0,320px) minmax(0,1fr)} }
+  .inputs{padding:16px}
+  .inputs .hint{font-size:12.5px;color:var(--ink-3);margin-bottom:12px}
+  .field{display:flex;justify-content:space-between;align-items:center;gap:10px;
+    padding:5px 0;border-bottom:1px dotted var(--line-soft);font-size:13.5px}
+  .field:last-of-type{border-bottom:0}
+  .field label{color:var(--ink-2);flex:1}
+  .field input{width:80px;text-align:right;font-size:15px;padding:5px 7px}
+  .grouptitle{font-size:11.5px;letter-spacing:.08em;color:var(--ai);font-weight:700;margin:14px 0 3px}
+  .presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+  .preset{font:inherit;font-size:13px;font-weight:700;cursor:pointer;border-radius:999px;
+    padding:7px 14px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink-2)}
+  .preset:hover{border-color:var(--ai);color:var(--ai)}
+  .preset:focus-visible{outline:2px solid var(--ai);outline-offset:2px}
+  .bars{padding:18px}
+  .bar-row{margin-bottom:16px}
+  .bar-label{display:flex;justify-content:space-between;align-items:baseline;font-size:13.5px;margin-bottom:6px;gap:10px}
+  .bar-label b{font-family:var(--mincho);font-size:20px;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .bar{height:24px;border-radius:4px;background:var(--surface-2);display:flex;overflow:hidden;border:1px solid var(--line-soft)}
+  .seg{height:100%}
+  .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-2);margin-top:2px}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;
+    border:1px solid rgba(128,128,128,.35)}
+  .result{background:var(--ai-soft);border:1px solid color-mix(in srgb,var(--ai) 30%,transparent);
+    border-radius:8px;padding:14px 16px;margin-top:8px}
+  .result .big{font-family:var(--mincho);font-size:clamp(25px,6vw,36px);line-height:1.2;
+    font-variant-numeric:tabular-nums;color:var(--ai)}
+  .result .sub{font-size:13.5px;color:var(--ink-2);margin-top:5px}
+  .slicewrap{overflow-x:auto;margin-top:14px}
+  table.slice{width:100%;border-collapse:collapse;font-size:13px;min-width:320px}
+  table.slice th,table.slice td{padding:7px 8px;border-bottom:1px solid var(--line-soft);
+    text-align:left;color:var(--ink);font-size:13px;font-family:var(--gothic)}
+  table.slice th{font-size:11.5px;color:var(--ink-3);font-weight:700}
+  table.slice td.n,table.slice th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  table.slice tr.hi td{background:var(--ok-soft)}
+
+  .split{display:grid;grid-template-columns:1fr;gap:14px}
+  @media (min-width:760px){ .split{grid-template-columns:1fr 1fr} }
+  .list{padding:16px 18px}
+  .list h3{margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .list h3 .mark{font-family:var(--mono);font-size:11.5px;border-radius:3px;padding:1px 7px;flex:none}
+  .m-cut{background:var(--ok-soft);color:var(--ok)}
+  .m-keep{background:var(--shu-soft);color:var(--shu)}
+  .list ul{margin:0;padding-left:1.15em;color:var(--ink-2);font-size:14px}
+  .list li{margin-bottom:7px}
+  .list li b{color:var(--ink)}
+  .note{border-left:3px solid var(--ai);background:var(--surface);padding:13px 15px;
+    font-size:14px;color:var(--ink-2);border-radius:0 7px 7px 0;box-shadow:var(--shadow)}
+  .note b{color:var(--ink)}
+  .note.warn{border-left-color:var(--shu)}
+  footer{border-top:1px solid var(--line);padding-top:18px;color:var(--ink-3);font-size:12.5px}
+  @media (prefers-reduced-motion: no-preference){ .seg{transition:width .35s ease} }
+</style>
+
+<div class="banner">検討用モック／画面・数値はすべてダミーです。実在の里親家庭・児童・申請の情報は含みません。</div>
+
+<div class="wrap">
+
+<header class="top">
+  <div class="eyebrow">さいたま市里親会・措置費事務の検討資料</div>
+  <h1>月100件の受付事務は、どこまで減るのか</h1>
+  <p class="lede">
+    「里親関係諸費請求のてびき（令和7年度版）」の様式・単価にもとづいて作った、動く見本です。
+    <b>スマホでそのままご覧ください。</b>上から順に、①里親が申請するまで、②事務局が受け付けて振込依頼書を作るまで。
+    <b>青いボタンは実際に押せます。</b>
+  </p>
+</header>
+
+
+
+<section id="flow1">
+  <div class="sec-head"><span class="sec-no">流れ①</span><h2>里親が申請するまで</h2></div>
+  <p class="sec-sub">LINEの中の画面です。費目を選ぶと、必要な入力欄だけが出ます。</p>
+
+  <div class="flow">
+    <div class="step" id="s1-1">
+      <div class="shead"><span class="stepno">1</span><div>
+        <h3>費目をえらんで、入力する</h3>
+        <p class="sd">選んだものによって画面の出方が3通りに変わります。切り替えて試せます。</p>
+      </div></div>
+      <div class="phone">
+        <div class="phone-bar"><span>さいたま市里親会</span><span>8月17日</span></div>
+        <div class="phone-body">
+          <label class="fld"><span class="steplabel">なにを申請しますか</span>
+            <select id="picker"></select></label>
+          <div id="pickinfo" class="steplabel"></div>
+          <div id="formarea"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow">↓</div>
+
+    <div class="step" id="s1-2">
+      <div class="shead"><span class="stepno">2</span><div>
+        <h3>出力される申請書</h3>
+        <p class="sd">上で入れた内容がそのまま様式に入ります。印刷して署名すれば、これまでどおり提出できます。</p>
+      </div></div>
+      <div class="a4bar">
+        <span id="a4-which-1"></span>
+        <button class="btn ghost sm" data-zoom="box1">大きく見る（原寸）</button>
+      </div>
+      <div class="a4box" id="box1" data-full="0"><div class="a4fit"><div class="a4" id="a4-1"></div></div></div>
+      <p class="note" style="margin-top:12px">
+        <b>いま使っている様式そのものに値を重ねて印刷します。</b>受け取る側には、これまでどおりの紙が届きます。
+      </p>
+    </div>
+  </div>
+
+  <p class="note warn" style="margin-top:16px">
+    <b>学校・医師・雇用主が書く13の証明書は、入力欄を出しません。</b>押印された紙が本体だからです。
+    できるのは「押した紙を写真で先に見てもらい、不備を早く見つける」ところまで。プルダウンで「もらう書類」を選ぶと、その画面になります。
+  </p>
+</section>
+
+<section id="flow2">
+  <div class="sec-head"><span class="sec-no">流れ②</span><h2>事務局が受け付けて、振込依頼書を作るまで</h2></div>
+  <p class="sec-sub">サンプル20件（2026年8月分）。費目の構成は学齢分布から置いた仮のものです。</p>
+
+  <div class="flow">
+    <div class="step" id="s2-1">
+      <div class="shead"><span class="stepno">1</span><div>
+        <h3>届いたものを受け付ける</h3>
+        <p class="sd">LINEで来た分は自動で一覧に並びます。<b>FAX・郵送・持参で届いた分は、事務局がここで手入力します。</b></p>
+      </div></div>
+
+      <div class="proxy">
+        <div class="proxy-head">
+          <b>FAX・郵送・持参で届いた分の入力</b>
+          <button class="btn ghost sm" id="proxy-toggle" aria-expanded="false">開く</button>
+        </div>
+        <div id="proxy-form" hidden>
+          <div class="pgrid">
+            <label class="fld"><span>世帯</span><select id="p-hh"></select></label>
+            <label class="fld"><span>児童</span><select id="p-ch"></select></label>
+            <label class="fld" style="grid-column:1/-1"><span>費目（様式）</span><select id="p-cat"></select></label>
+            <label class="fld"><span>金額（円）</span><input type="number" id="p-amt" value="12000" min="0"></label>
+            <label class="fld"><span>受領方法</span><select id="p-how"><option>FAX</option><option>郵送</option><option>持参</option></select></label>
+            <label class="fld" style="grid-column:1/-1"><span>受領日</span><input type="text" id="p-date" value="2026年8月17日"></label>
+          </div>
+          <button class="btn" id="p-add" style="margin-top:10px">一覧に追加する</button>
+          <div id="p-out" style="margin-top:8px"></div>
+          <p style="font-size:12px;color:var(--ink-3);margin-top:8px;line-height:1.6">
+            <b>この入力の手間は残ります。</b>だから「紙をLINEに寄せる」ことが効きます。
+            ただ入力してしまえば以降はLINE提出分と同じ扱いになり、検算・上限チェック・月末の集計は自動で通ります。
+            紙で届いた原本は、これまでどおり保管・回付します。
+          </p>
+        </div>
+      </div>
+
+      <div class="chips" id="chips"></div>
+      <div class="filters">
+        <label>状態 <select id="f-status"><option value="">すべて</option></select></label>
+        <label>提出 <select id="f-src"><option value="">すべて</option><option>LINE</option><option>紙・FAX</option></select></label>
+        <label><input type="checkbox" id="f-ex" style="width:auto"> 要相談だけ</label>
+      </div>
+      <div class="tablewrap">
+        <table class="data">
+          <thead><tr>
+            <th>受付番号</th><th>世帯</th><th>児童</th><th>費目</th><th>様式</th>
+            <th style="text-align:right">金額</th><th>提出</th><th>自動チェック</th><th>状態</th>
+          </tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <button class="btn ghost sm" id="more" style="width:100%;margin-top:8px">もっと見る</button>
+      <p style="font-size:12.5px;color:var(--ink-3);margin-top:8px" id="count"></p>
+    </div>
+
+    <div class="arrow">↓</div>
+
+    <div class="step" id="s2-2">
+      <div class="shead"><span class="stepno">2</span><div>
+        <h3>申請の中身をみる</h3>
+        <p class="sd">「異常なし（自動）」が、いま人が目でやっている確認です——合計の検算、上限との突合、添付の有無、対象外費目の混入。</p>
+      </div></div>
+      <div class="detail" id="detail"></div>
+    </div>
+
+    <div class="arrow">↓</div>
+
+    <div class="step" id="s2-3">
+      <div class="shead"><span class="stepno">3</span><div>
+        <h3>申請書のかたちで確認する</h3>
+        <p class="sd">上の「申請書のかたちで見る」か、下の「振込依頼書を作成する」を押すと、ここに出ます。</p>
+      </div></div>
+      <div class="a4bar">
+        <span id="a4-which-2"></span>
+        <button class="btn ghost sm" data-zoom="box2">大きく見る（原寸）</button>
+      </div>
+      <div class="a4box" id="box2" data-full="0"><div class="a4fit"><div class="a4" id="a4-2"></div></div></div>
+    </div>
+
+    <div class="arrow">↓</div>
+
+    <div class="step" id="s2-4">
+      <div class="shead"><span class="stepno">4</span><div>
+        <h3>確認が済んだ分をまとめて、振込依頼書を作る</h3>
+        <p class="sd">上の段で「確認完了にする」を押すと、この合計に積まれます。</p>
+      </div></div>
+      <div class="payline">
+        <div class="sum">確認が済んだ分　<b id="pay-sum">—</b> <span id="pay-n"></span></div>
+        <button class="btn" id="pay-btn">振込依頼書を作成する</button>
+      </div>
+      <div id="pay-out" style="margin-top:10px"></div>
+      <p class="note warn" style="margin-top:12px">
+        <b>振込の実行は作りません。</b>依頼書（書類）を出すところまでが仕組みの役割で、<b>送信ボタンは必ず人が押します。</b>
+        口座番号もこの仕組みでは持ちません——入会時（様式2）に届出された既存の台帳で突合します。
+      </p>
+    </div>
+  </div>
+</section>
+
+<section id="cases-sec">
+  <div class="sec-head"><span class="sec-no">要点</span><h2>いちばん手がかかるのは「これは対象か」の判断</h2></div>
+  <p class="sec-sub">
+    定型の申請より、<b>「これは対象になるのか」の判断</b>に手がかかります。相談・判断・根拠を1件ずつ残して、
+    次に同じ相談が来たら先に出す。以下はサンプルですが、<b>中身はすべててびきの実際の線引き</b>です。
+  </p>
+  <div class="filters">
+    <input type="search" id="case-q" placeholder="自転車、眼鏡、部活、アルバム…" style="flex:1;min-width:180px">
+    <span style="color:var(--ink-3);font-size:13px" id="case-count"></span>
+  </div>
+  <div class="cases" id="cases"></div>
+  <p class="note" style="margin-top:14px">
+    <b>決めるのは人です。</b>仕組みは過去の判断を探して見せるだけ。<b>紙の運用を変えないので、今日から始められます。</b>
+  </p>
+</section>
+
+
+
+<section id="honest">
+  <div class="sec-head"><span class="sec-no">範囲</span><h2>減る工程と、残る工程</h2></div>
+  <p class="sec-sub">全部がデジタルになるわけではありません。ここを曖昧にしたまま始めると、後で「話が違う」になります。</p>
+  <div class="split">
+    <div class="card list">
+      <h3><span class="mark m-cut">減る</span>仕組みが引き受ける</h3>
+      <ul>
+        <li><b>費目の案内</b>——学齢から使える費目と必要な様式を出す。てびきを探さない。</li>
+        <li><b>計算と検算</b>——通院費・送迎費・月別集計。合計欄の訂正が起きない。</li>
+        <li><b>上限のチェック</b>——単価表と突合して入力時に警告。</li>
+        <li><b>台帳への転記</b>——最初からデータなので転記が消える。</li>
+        <li><b>月末の集計・支払リスト・振込依頼書の作成</b>——自動で出る。人は確認だけ。</li>
+        <li><b>期限の催促</b>——毎月25日ごろ、3月下旬。名簿を見て電話しなくてよい。</li>
+        <li><b>過去の判断を探す</b>——同じ相談の答えを、調べ直さずに出す。</li>
+      </ul>
+    </div>
+    <div class="card list">
+      <h3><span class="mark m-keep">残る</span>これまでどおり人がやる</h3>
+      <ul>
+        <li><b>例外の判断</b>——対象になるかを決めるのは人。仕組みは過去例を出すだけ。</li>
+        <li><b>第三者の証明書13種</b>——学校長印・園長印・医師印・雇用主印。紙に押した印が本体。</li>
+        <li><b>原本の授受</b>——郵送・持参。写真は事前確認まで。</li>
+        <li><b>署名・押印</b>——里親が書く様式も、最後は手で署名する。</li>
+        <li><b>FAX・郵送で届いた分の入力</b>——事務局が代理で入力する。<b>ここは減りません。</b>だから「紙をLINEに寄せる」ことが効きます。</li>
+        <li><b>支給の決定</b>——市・児相の事務。仕組みの外。</li>
+        <li><b>振込の実行と複数人チェック</b>——依頼書までは作る。<b>振込そのものは作りません。</b></li>
+        <li><b>口座情報の管理</b>——口座番号は持ちません。入会時の届出台帳で突合。</li>
+        <li><b>支給決定通知の発送</b>——従来どおり。</li>
+      </ul>
+    </div>
+  </div>
+
+  <p class="note warn" style="margin-top:16px">
+    <b>受取口座は埼玉縣信用金庫 浦和支店に揃っており（入会時に届出）、支給日も毎月5日です。</b>
+    毎月の支給は「1金庫・1支店あての総合振込1本」にまとめられます。
+    ただし<b>口座情報は仕組みに持たせない</b>（金額と世帯だけを渡し、口座は既存の届出台帳で突合）、
+    <b>送信ボタンは必ず人が押す</b>——この2点は動かさないほうがよいと考えています。
+  </p>
+</section>
+
+
+
+<footer>
+  出典：「令和7年度版 里親関係諸費請求のてびき」（さいたま市里親会事務局）。
+  画面・氏名・金額・件数はすべてダミーで、実在の里親家庭および児童の情報は含みません。
+</footer>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var $ = function(id){ return document.getElementById(id); };
+  var yen = function(v){ return Math.round(v).toLocaleString('ja-JP'); };
+  var esc = function(s){ return String(s).replace(/[&<>"]/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); };
+  function goto(id){
+    var el = $(id); if (!el || !el.scrollIntoView) return;
+    el.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  /* ===== A4：幅に合わせて縮小／原寸切替 ===== */
+  function fitA4(){
+    ['box1','box2'].forEach(function(id){
+      var box = $(id); if (!box) return;
+      var fit = box.querySelector('.a4fit'), sheet = fit.querySelector('.a4');
+      var pad = 24, avail = box.clientWidth - pad;
+      var full = box.dataset.full === '1';
+      var s = full ? 1 : Math.min(1, avail / 794);
+      fit.style.transform = 'scale(' + s + ')';
+      var h = Math.max(sheet.scrollHeight, 1123);
+      box.style.height = full ? '' : (h * s + pad) + 'px';
+      fit.style.height = full ? (h + 'px') : (h * s) + 'px';
+    });
+  }
+  document.addEventListener('click', function(e){
+    var b = e.target.closest('[data-zoom]'); if (!b) return;
+    var box = $(b.dataset.zoom);
+    var full = box.dataset.full === '1';
+    box.dataset.full = full ? '0' : '1';
+    b.textContent = full ? '大きく見る（原寸）' : '幅に合わせる';
+    fitA4();
+  });
+  window.addEventListener('resize', fitA4);
+
+  function renderA4Doc(target, which, d){
+    if (!d){
+      $(target).innerHTML = '<div class="a4-title" style="letter-spacing:.08em">出力する書式はありません</div>' +
+        '<p style="text-align:center">学校・医師・雇用主が記入して押印する証明書、または事前相談の費目です。' +
+        '「自分で書く」費目を選ぶと、ここに申請書が出ます。</p>';
+      if (which) $(which).textContent = '';
+      fitA4(); return;
+    }
+    $(target).innerHTML =
+      '<div class="a4-form">' + esc(d.form) + '</div>' +
+      '<div class="a4-title">' + esc(d.title) + '</div>' +
+      '<div class="a4-to">' + esc(d.to) + '</div>' +
+      '<table><tbody>' + d.sheet.map(function(row){
+        return '<tr><th>' + esc(row[0]) + '</th><td>' + esc(row[1]).replace(/\n/g, '<br>') + '</td></tr>';
+      }).join('') + '</tbody></table>' +
+      '<div class="a4-total"><span style="font-size:13px">' + esc(d.totalLabel || '合計') + '</span><span>' +
+        yen(d.total) + ' 円</span></div>' +
+      '<div class="a4-foot"><span>' + esc(d.signer || '令和8年8月17日　　里親氏名　さいたま　太郎') + '</span>' +
+        '<span class="seal">' + (d.sealText || '里親<br>之印') + '</span></div>' +
+      '<div class="a4-note">' + esc(d.attach || '') +
+        '<br>※ この見本は体裁のイメージです。実装ではてびきPDFの様式ページそのものに値を重ねて印刷します。</div>';
+    if (which) $(which).textContent = d.form + '　' + d.title;
+    fitA4();
+  }
+
+  /* ===== 費目のスキーマ ===== */
+  var FORMS = [
+    {
+      key:'f28', kind:'self', form:'様式28', label:'通院費（交通費）', who:'自分で書く様式',
+      title:'医療機関への通院費請求書', to:'さいたま市長　宛',
+      attach:'通院が分かる資料（領収書等）と、交通費の分かるもの（ICカードの履歴等）を添付',
+      fields:[
+        {k:'hospital', t:'text',  l:'医療機関名', v:'〇〇病院'},
+        {k:'from',     t:'text',  l:'乗車区間（から）', v:'与野本町駅'},
+        {k:'to',       t:'text',  l:'乗車区間（まで）', v:'中浦和駅'},
+        {k:'fare',     t:'yen',   l:'児童の片道運賃（円）', v:167},
+        {k:'escort',   t:'yen',   l:'付添人の片道運賃（歩行が困難な場合のみ）', v:0},
+        {k:'days',     t:'days',  l:'通院した日（8月）', v:[3,5,7,8,12,15,17,19,22,24,26,29,31]}
+      ],
+      calc:function(v){
+        var round = (v.fare + v.escort) * 2, n = v.days.length, total = round * n;
+        return {
+          lines:[['往復費用', '（' + yen(v.fare) + '円＋' + yen(v.escort) + '円）× 2 ＝ ' + yen(round) + '円'],
+                 ['通院日数', n + '日'],
+                 ['請求額',   yen(round) + '円 × ' + n + '日']],
+          sheet:[['児童氏名','（A児）'],['児童住所','さいたま市中央区下落合５－６－１１'],
+                 ['医療機関名', v.hospital],['乗車区間', v.from + '　から　' + v.to + '　まで'],
+                 ['往復費用','①児童：片道 ' + yen(v.fare) + '円 × 2 ＝ ' + yen(v.fare*2) + '円\n②付添人：' +
+                   (v.escort ? '片道 ' + yen(v.escort) + '円 × 2 ＝ ' + yen(v.escort*2) + '円' : '－') +
+                   '\n①＋② ＝ ' + yen(round) + '円'],
+                 ['通院月日','8月　' + v.days.join('・') + '　　日数合計 ' + n + '日'],
+                 ['請求額', yen(round) + '円 × ' + n + '日 ＝ ' + yen(total) + '円']],
+          total: total,
+          flags: n === 0 ? [['ng','通院した日が選ばれていません']] : []
+        };
+      }
+    },
+    {
+      key:'f25', kind:'self', form:'様式25-2', label:'一時保護児童の通学送迎費', who:'自分で書く様式',
+      title:'一時保護委託児童通学送迎費計算書', to:'さいたま市児童相談所長／さいたま市里親会会長　宛',
+      attach:'様式25-1（申請書）も併せて提出。児童相談所長が申請事由の可否を判断します',
+      fields:[
+        {k:'method', t:'select', l:'送迎の方法', v:'乗用車（自家用車）', o:['乗用車（自家用車）','公共交通機関']},
+        {k:'km',     t:'num',    l:'片道の最短距離（km）', v:15},
+        {k:'fare',   t:'yen',    l:'児童の片道運賃（公共交通の場合）', v:0},
+        {k:'escort', t:'yen',    l:'付添人の片道運賃（公共交通の場合）', v:0},
+        {k:'days',   t:'num',    l:'送迎した日数', v:14}
+      ],
+      calc:function(v){
+        var car = v.method.indexOf('乗用車') === 0, per = 0, lines = [], flags = [];
+        if (car){
+          var km = Math.floor(v.km);
+          if (v.km < 1.5){ per = 0; flags.push(['ng','片道1.5km未満は支給されません（てびき 付録1 第2条）']); }
+          else { per = km * 2 * 37; lines.push(['往復費用', '（' + km + 'km × 2）× 37円 ＝ ' + yen(per) + '円']); }
+          if (v.km >= 1.5 && v.km !== km) flags.push(['info','1km未満は切り捨てます（' + v.km + 'km → ' + km + 'km）']);
+        } else {
+          per = (v.fare + v.escort) * 2;
+          lines.push(['往復費用', '（' + yen(v.fare) + '円＋' + yen(v.escort) + '円）× 2 ＝ ' + yen(per) + '円']);
+        }
+        if (per > 1860){ flags.push(['ng','日額の上限 1,860円 を超えています。1,860円で計算します']); per = 1860; }
+        lines.push(['送迎日数', v.days + '日']);
+        return {
+          lines: lines, total: per * v.days,
+          sheet:[['対象児童名','（A児）'],['学年','小学6年生'],
+                 ['委託期間','令和8年〇月〇日　～　令和8年〇月〇日'],['うち送迎日数', v.days + '日'],
+                 ['往復費用', car ? '（' + Math.floor(v.km) + 'km × 2）× 37円 ＝ ' + yen(per) + '円'
+                                  : '①児童 片道 ' + yen(v.fare) + '円 × 2／②付添人 片道 ' + yen(v.escort) + '円 × 2　＝ ' + yen(per) + '円'],
+                 ['請求額（総計）', yen(per) + '円 × ' + v.days + '日 ＝ ' + yen(per * v.days) + '円']],
+          flags: flags
+        };
+      }
+    },
+    {
+      key:'f26', kind:'self', form:'様式26', label:'大学等受験費', who:'自分で書く様式',
+      title:'大学等受験費申請書', to:'さいたま市長　宛',
+      attach:'受験を証明する受験料等の支払証明（領収書写し）等を添付',
+      fields:[
+        {k:'school', t:'text',  l:'受験先名称', v:'さいたま市立大学'},
+        {k:'date',   t:'text',  l:'受験予定日', v:'令和8年2月10日'},
+        {k:'items',  t:'items', l:'用途・費用内訳',
+          v:[['受験料',35000],['交通費・北浦和駅～大宮駅（JR）の往復',334]]},
+        {k:'jasso',  t:'check', l:'日本学生支援機構の受験料等支援（20万円）を申請している', v:false}
+      ],
+      calc:function(v){
+        var sum = v.items.reduce(function(a,r){ return a + (r[1] || 0); }, 0);
+        var lines = [['費用の合計', yen(sum) + '円']], flags = [], total = sum;
+        if (v.jasso){ total = Math.max(0, sum - 200000); lines.push(['学生支援機構の支援', '－200,000円']); }
+        if (total > 158000){ flags.push(['ng','上限 158,000円 を超えています（超過分 ' + yen(total - 158000) + '円）']); }
+        else if (sum > 0){ flags.push(['good','上限 158,000円 の範囲内です']); }
+        return {
+          lines: lines, total: total,
+          sheet:[['児童氏名','（B児）'],['受験予定日', v.date],['受験先名称', v.school],
+                 ['用途・費用内訳', v.items.map(function(r){ return r[0] + '　' + yen(r[1]) + '円'; }).join('\n')],
+                 ['学生支援機構の受験料等支援', v.jasso ? '☑ 申請している（合計から200,000円を控除）' : '□ 申請していない'],
+                 ['合計金額', yen(total) + '円']],
+          flags: flags
+        };
+      }
+    },
+    {
+      key:'f24', kind:'self', form:'様式24', label:'受託支度費', who:'自分で書く様式',
+      title:'受託支度費証明書', to:'さいたま市長　宛',
+      attach:'領収書を添付。委託に向けた手続の開始日から委託の1か月後までに購入したものが対象',
+      fields:[
+        {k:'items', t:'items', l:'購入したもの',
+          v:[['布団',10000],['シーツ',5000],['肌着',5000],['衣類',15000]]}
+      ],
+      calc:function(v){
+        var sum = v.items.reduce(function(a,r){ return a + (r[1] || 0); }, 0), flags = [];
+        if (sum > 44630) flags.push(['ng','上限 44,630円 を超えています（超過分 ' + yen(sum - 44630) + '円）']);
+        else if (sum > 0) flags.push(['good','上限 44,630円 の範囲内です']);
+        return {
+          lines:[['合計', yen(sum) + '円']], total: sum,
+          sheet:[['児童氏名','（A児）'],
+                 ['内訳', v.items.map(function(r){ return '令和8年〇月〇日　' + r[0] + '　' + yen(r[1]) + '円'; }).join('\n')],
+                 ['合計金額', yen(sum) + '円']],
+          flags: flags
+        };
+      }
+    },
+    {
+      key:'f16', kind:'self', form:'様式16', label:'いとしご育成事業 受験料助成（会の補助金）', who:'自分で書く様式',
+      title:'いとしご育成事業受験料助成金申請書', to:'さいたま市里親会長　宛',
+      attach:'受験を証明する受験料の支払証明（領収書写し）等を添付。合否は問わず、1人あたり1回30,000円',
+      fields:[
+        {k:'type',   t:'select', l:'種別', v:'大学', o:['大学','短期大学','専門学校']},
+        {k:'school', t:'text',   l:'受験先名称', v:'さいたま市立大学'},
+        {k:'date',   t:'text',   l:'受験予定日', v:'令和8年2月10日'}
+      ],
+      calc:function(v){
+        return {
+          lines:[['助成額','定額 30,000円（合否を問わず1人1回）']], total:30000,
+          sheet:[['児童氏名','（B児）'],['種別','☑ ' + v.type],['受験先名称', v.school],
+                 ['受験先所在地','さいたま市緑区大字中尾９７５－１'],['受験予定日', v.date]],
+          flags:[['good','宛先が里親会長＝会の事務なので、市の承認を待たずに電子化できる費目です']]
+        };
+      }
+    },
+    {
+      key:'f6', kind:'other', form:'様式6', label:'教材費', who:'学校が書く証明書',
+      desc:'学校が「教科書に準ずる正規の教材」として指定したことを証明する書類です。<b>校長印</b>が押された紙が本体なので、この画面では入力しません。',
+      warn:'学級費・積立金・課外授業参加費・PTA会費・生徒手帳代・卒業アルバム代は、教材費では支給されません（教育費のほうに含まれます）。'
+    },
+    {
+      key:'f20', kind:'other', form:'様式20', label:'医療費（眼鏡・歯列矯正・予防接種など）', who:'医師が書く証明書',
+      desc:'意見書・領収書・医師同意書が1枚になった書類で、<b>医師印が最大3か所</b>必要です。もらったら写真を送ってください。',
+      warn:'眼鏡は眼科医の処方箋の写し、予防接種は母子手帳の写しも要ります。'
+    },
+    {
+      key:'x1', kind:'ask', form:'—', label:'4万円を超える自転車を買いたい', who:'事前の相談が必要',
+      desc:'てびきに「4万円を超える自転車を購入したい場合は事前にご相談ください」とあります。申請の前に相談を受け付けます。',
+      cases:['自転車']
+    },
+    {
+      key:'x2', kind:'ask', form:'—', label:'そのほか（判断に迷うもの）', who:'事前の相談が必要',
+      desc:'どの費目に当たるか分からないもの、てびきに書かれていないものは、まず相談として受け付けます。過去に同じ相談があれば先にお見せします。',
+      cases:['']
+    }
+  ];
+
+  /* ===== 判断事例（サンプル・中身はてびきの線引き） ===== */
+  var CASES = [
+    {q:'4万円を超える自転車を買いたい', v:'ask', a:'事前相談が必要。通学に必要な自転車・ヘルメットは実費だが、4万円超は事前に相談する取扱い。様式10（自転車通学許可証明書）と領収書が要る。',
+     src:'てびき 小・中学校欄の注記', by:'事務局', at:'2026-05-12', tags:'自転車 ヘルメット 通学'},
+    {q:'卒業アルバム代は教材費で出せるか', v:'no', a:'出せない。学級費・積立金・課外事業参加費・PTA会費・生徒手帳・卒業アルバムは教材費の対象外。これらは教育費（月額）に含まれている。',
+     src:'様式6の注記／てびき 教材費の欄', by:'事務局', at:'2026-04-20', tags:'教材費 アルバム PTA 学級費'},
+    {q:'部活動の後援会費を部活動費で請求できるか', v:'no', a:'できない。様式8の記入例に「後援会費などは不可」とある。用具代・遠征費は対象。遠征費は日時・行き先・交通機関・宿泊場所を明記する。',
+     src:'様式8 記入例', by:'事務局', at:'2026-06-03', tags:'部活動 遠征 後援会'},
+    {q:'家庭教師の月謝は学習塾費で出せるか', v:'no', a:'学習塾費では出せない（家庭教師は対象外）。ただし発達障害等で集団学習になじまない場合の個別学習経費は「特別補習費」（上限月25,000円）で、こちらも事前相談。',
+     src:'てびき 中学校・学習塾費／特別補習費', by:'事務局', at:'2026-06-18', tags:'学習塾 家庭教師 特別補習費'},
+    {q:'眼鏡はどこまで認められるか', v:'ask', a:'一般的なものより高価なもの（ブランド品等）は認められない場合がある。眼科医の処方箋（写し可）を添付。コンタクトレンズは必要最小限で。',
+     src:'てびき 医療費欄の注記', by:'事務局', at:'2026-03-09', tags:'眼鏡 コンタクト 医療費 治療材料'},
+    {q:'定期的な通院の交通費を毎月出したい', v:'ask', a:'「里親委託児童通院費」は事前相談が必要で、上限は月15,000円（専門里親）／7,500円（それ以外）。通院先が医療機関の場合の通院方法は乗用車に限る。単発の通院交通費は様式28で実費。',
+     src:'てびき 医療費欄／様式28', by:'事務局', at:'2026-07-01', tags:'通院 交通費 乗用車'},
+    {q:'高校のオンライン授業に必要な機器を買いたい', v:'ask', a:'事前相談が必要。てびきに「高等学校のオンライン授業等に必要な通信機器等について請求する際は、事前にご相談ください」とある。',
+     src:'てびき 高等学校欄の注記', by:'事務局', at:'2026-05-28', tags:'オンライン 通信機器 高校 スマートフォン'},
+    {q:'大学の受験料補助は何校まで出せるか', v:'yes', a:'子どもの暮らし応援事業の大学等受験料は、1人あたり60,000円まで・受験回数2校分までが上限で、補助金予算の範囲内。措置費対象経費を控除した額。支払は翌年度5月頃。',
+     src:'てびき 子どもの暮らし応援事業補助金', by:'事務局', at:'2026-04-02', tags:'受験料 大学 補助金 2校'},
+    {q:'学校給食費はどの書類で出すのか', v:'yes', a:'さいたま市立の学校なら「学校給食費納付額決定通知書」の写し（毎年6月20日ごろ教育委員会から郵送）。市立以外なら様式5の給食費証明書。3月分は児相が教育委員会に実額を確認して調整する。',
+     src:'てびき ※注1', by:'事務局', at:'2026-06-25', tags:'給食費 通知書 公会計'},
+    {q:'防災用の備蓄を買った分はいつ出るか', v:'yes', a:'防災対策費は上限450,000円で、3月分の措置費として支払われる（様式23＋領収書）。年度末なので、3月下旬の提出期限に間に合わせる必要がある。',
+     src:'様式23／てびき 防災対策費', by:'事務局', at:'2026-02-14', tags:'防災 備蓄 3月 期限'},
+    {q:'就職に必要で免許を取る場合の費用は', v:'yes', a:'子どもの暮らし応援事業の自動車運転免許取得料（上限185,000円）。ただし免許取得が雇用の条件等、就労のために必要な場合に限る。様式22は宛先が里親会長で、雇用主に理由を証明してもらう。',
+     src:'様式22／てびき 補助金欄', by:'事務局', at:'2026-01-30', tags:'免許 自動車 就職 教習所'},
+    {q:'幼稚園の延長保育料は対象になるか', v:'no', a:'対象外。様式3に「寄付金・延長保育料は対象外になります」と明記。園児服・カバン等の指定用品は様式4（幼稚園指定用品証明書）のほうに書く。',
+     src:'様式3／様式4', by:'事務局', at:'2026-05-06', tags:'幼稚園 延長保育 寄付金 指定用品'}
+  ];
+
+  /* ===== 流れ① ===== */
+  var current = FORMS[0], state = {};
+  FORMS.forEach(function(f){
+    if (!f.fields) return;
+    state[f.key] = {};
+    f.fields.forEach(function(fd){
+      state[f.key][fd.k] = Array.isArray(fd.v) ? JSON.parse(JSON.stringify(fd.v)) : fd.v;
+    });
+  });
+
+  var GROUPS = [
+    ['self',  '自分で書く様式（入力して印刷）'],
+    ['other', 'もらう書類（学校・医師などが記入して押印）'],
+    ['ask',   '事前の相談が必要なもの']
+  ];
+  $('picker').innerHTML = GROUPS.map(function(g){
+    var list = FORMS.filter(function(f){ return f.kind === g[0]; });
+    return '<optgroup label="' + g[1] + '">' + list.map(function(f){
+      return '<option value="' + f.key + '"' + (f === current ? ' selected' : '') + '>' +
+        esc(f.label) + (f.form === '—' ? '' : '（' + f.form + '）') + '</option>';
+    }).join('') + '</optgroup>';
+  }).join('');
+  $('picker').addEventListener('change', function(){
+    current = FORMS.filter(function(f){ return f.key === $('picker').value; })[0];
+    renderForm();
+  });
+
+  function renderForm(){
+    var f = current, h = '';
+    $('pickinfo').textContent =
+      f.kind === 'self'  ? f.form + '／自分で書く様式' :
+      f.kind === 'other' ? f.form + '／' + f.who + '（押印された紙が本体）' : '事前の相談が必要';
+
+    if (f.kind !== 'self'){
+      h += '<div class="flag info">' + f.desc + '</div>';
+      if (f.warn) h += '<div class="flag ng">' + esc(f.warn) + '</div>';
+      if (f.kind === 'other'){
+        h += '<button class="btn">写真を送る</button><button class="btn ghost">書き方の見本を見る</button>';
+      } else {
+        h += '<div class="steplabel">過去に同じ相談があります</div>';
+        var hits = CASES.filter(function(c){
+          return !f.cases[0] || (c.q + c.tags).indexOf(f.cases[0]) >= 0; }).slice(0, 2);
+        h += hits.map(function(c){
+          return '<div class="flag good"><b>' + esc(c.q) + '</b><br>' + esc(c.a.slice(0, 60)) +
+                 '…<br><span style="opacity:.8">' + esc(c.src) + '／' + c.at + '</span></div>';
+        }).join('');
+        h += '<button class="btn">この件で相談する</button>';
+      }
+      $('formarea').innerHTML = h;
+      renderA4Doc('a4-1', 'a4-which-1', null);
+      return;
+    }
+
+    var v = state[f.key];
+    f.fields.forEach(function(fd){
+      if (fd.t === 'text' || fd.t === 'yen' || fd.t === 'num'){
+        h += '<label class="fld"><span>' + esc(fd.l) + '</span><input type="' +
+             (fd.t === 'text' ? 'text' : 'number') + '" data-k="' + fd.k + '" value="' +
+             esc(v[fd.k]) + '"' + (fd.t === 'num' ? ' step="0.1"' : '') + '></label>';
+      } else if (fd.t === 'select'){
+        h += '<label class="fld"><span>' + esc(fd.l) + '</span><select data-k="' + fd.k + '">' +
+             fd.o.map(function(o){ return '<option' + (o === v[fd.k] ? ' selected' : '') + '>' + esc(o) + '</option>'; }).join('') +
+             '</select></label>';
+      } else if (fd.t === 'check'){
+        h += '<label class="fld" style="flex-direction:row;align-items:flex-start;gap:8px">' +
+             '<input type="checkbox" data-k="' + fd.k + '" style="width:auto;margin-top:5px"' +
+             (v[fd.k] ? ' checked' : '') + '><span style="color:var(--ink-2);font-size:12.5px">' + esc(fd.l) + '</span></label>';
+      } else if (fd.t === 'items'){
+        h += '<div class="fld"><span>' + esc(fd.l) + '</span>' +
+             v[fd.k].map(function(r, i){
+               return '<div class="itemrow"><input type="text" data-k="' + fd.k + '" data-i="' + i +
+                 '" data-c="0" value="' + esc(r[0]) + '"><input type="number" data-k="' + fd.k +
+                 '" data-i="' + i + '" data-c="1" value="' + r[1] + '"></div>';
+             }).join('') +
+             '<button class="btn ghost" type="button" data-add="' + fd.k + '">行を追加</button></div>';
+      } else if (fd.t === 'days'){
+        h += '<div class="fld"><span>' + esc(fd.l) + '（タップで選択）</span><div class="daygrid">';
+        for (var d = 1; d <= 31; d++){
+          h += '<button class="day" type="button" data-day="' + d + '" aria-pressed="' +
+               (v[fd.k].indexOf(d) >= 0) + '">' + d + '</button>';
+        }
+        h += '</div></div>';
+      }
+    });
+
+    var r = f.calc(v);
+    h += '<div class="calcbox">' +
+      r.lines.map(function(l){ return '<div class="calcline"><span>' + esc(l[0]) + '</span><b>' + esc(l[1]) + '</b></div>'; }).join('') +
+      '<div class="calctotal"><span>請求額</span><b>' + yen(r.total) + ' 円</b></div></div>';
+    (r.flags || []).forEach(function(fl){ h += '<div class="flag ' + fl[0] + '">' + esc(fl[1]) + '</div>'; });
+    h += '<div class="flag" style="background:var(--surface-2);color:var(--ink-3)">添付：' + esc(f.attach) + '</div>';
+    h += '<button class="btn" data-submit="1">この内容で申請する</button><div id="sent"></div>';
+    $('formarea').innerHTML = h;
+    renderA4Doc('a4-1', 'a4-which-1', {form:f.form, title:f.title, to:f.to,
+      sheet:r.sheet, total:r.total, attach:f.attach});
+  }
+
+  function recalcInline(){
+    var r = current.calc(state[current.key]);
+    var box = $('formarea').querySelector('.calcbox');
+    if (box){
+      box.innerHTML = r.lines.map(function(l){
+        return '<div class="calcline"><span>' + esc(l[0]) + '</span><b>' + esc(l[1]) + '</b></div>'; }).join('') +
+        '<div class="calctotal"><span>請求額</span><b>' + yen(r.total) + ' 円</b></div>';
+      var next = box.nextElementSibling;
+      while (next && next.classList.contains('flag')){ var rm = next; next = next.nextElementSibling; rm.remove(); }
+      box.insertAdjacentHTML('afterend',
+        (r.flags || []).map(function(fl){ return '<div class="flag ' + fl[0] + '">' + esc(fl[1]) + '</div>'; }).join('') +
+        '<div class="flag" style="background:var(--surface-2);color:var(--ink-3)">添付：' + esc(current.attach) + '</div>');
+    }
+    renderA4Doc('a4-1', 'a4-which-1', {form:current.form, title:current.title, to:current.to,
+      sheet:r.sheet, total:r.total, attach:current.attach});
+  }
+
+  $('formarea').addEventListener('input', function(e){
+    var el = e.target, k = el.dataset.k;
+    if (!k) return;
+    var v = state[current.key];
+    if (el.dataset.c !== undefined){
+      var i = +el.dataset.i, c = +el.dataset.c;
+      v[k][i][c] = c === 1 ? (parseFloat(el.value) || 0) : el.value;
+    } else if (el.type === 'checkbox'){ v[k] = el.checked; }
+    else if (el.type === 'number'){ v[k] = parseFloat(el.value) || 0; }
+    else { v[k] = el.value; }
+    recalcInline();
+  });
+  $('formarea').addEventListener('change', function(e){
+    if (e.target.tagName === 'SELECT' || e.target.type === 'checkbox') renderForm();
+  });
+  $('formarea').addEventListener('click', function(e){
+    var d = e.target.closest('[data-day]');
+    if (d){
+      var key = current.fields.filter(function(f){ return f.t === 'days'; })[0].k;
+      var arr = state[current.key][key], n = +d.dataset.day, at = arr.indexOf(n);
+      if (at >= 0) arr.splice(at, 1); else { arr.push(n); arr.sort(function(a,b){ return a-b; }); }
+      d.setAttribute('aria-pressed', String(at < 0));
+      recalcInline(); return;
+    }
+    var add = e.target.closest('[data-add]');
+    if (add){ state[current.key][add.dataset.add].push(['', 0]); renderForm(); return; }
+    if (e.target.closest('[data-submit]')){
+      $('sent').innerHTML = '<div class="toast">申請しました。申請書ができています（下の段）。' +
+        '印刷して署名すれば、これまでどおり提出できます。</div>';
+      goto('s1-2');
+    }
+  });
+
+  /* ===== 流れ② サンプル100件 ===== */
+  function rng(seed){ return function(){ seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    var t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  var rand = rng(20260817);
+  function pick(a){ return a[Math.floor(rand() * a.length)]; }
+  function between(lo, hi){ return Math.round((lo + rand() * (hi - lo)) / 10) * 10; }
+
+  var CATS = [
+    {n: 3, cat:'教材費', form:'様式6', who:'学校', lo:3000, hi:22000},
+    {n: 3, cat:'学習塾費・補習費', form:'様式9', who:'学習塾', lo:8000, hi:45000},
+    {n: 2, cat:'特別育成費', form:'様式11', who:'学校', lo:20000, hi:39540},
+    {n: 2, cat:'医療費（交通費）', form:'様式28', who:'里親', lo:600, hi:9000},
+    {n: 2, cat:'通学費', form:'様式7', who:'里親', lo:3000, hi:38000},
+    {n: 2, cat:'部活動費', form:'様式8', who:'学校', lo:2000, hi:51000},
+    {n: 1, cat:'治療材料等給付費', form:'様式20', who:'医師', lo:3000, hi:120000},
+    {n: 1, cat:'幼稚園費', form:'様式3', who:'幼稚園', lo:25000, hi:90000},
+    {n: 1, cat:'見学旅行費', form:'様式12', who:'学校', lo:22690, hi:111290},
+    {n: 1, cat:'受託支度費', form:'様式24', who:'里親', lo:15000, hi:44630},
+    {n: 1, cat:'大学等受験費', form:'様式26', who:'里親', lo:35000, hi:158000},
+    {n: 1, cat:'いとしご育成事業（会補助）', form:'様式16', who:'里親', lo:30000, hi:30000}
+  ];
+  var NG_PAPER = ['合計欄が訂正されている（訂正不可）','校長印の押印がない','領収書の添付がない',
+    '定期券の写しがない','PTA会費・卒業アルバム代が含まれている（対象外）','月の記入漏れがある',
+    '合計額が内訳と一致しない','上限額（月39,540円）を超えている'];
+  var NG_LINE = ['領収書の写真が不鮮明','添付が1枚不足'];
+  var EX_REASON = [['4万円を超える自転車の購入','4万円を超える自転車を買いたい'],
+    ['家庭教師分が含まれている','家庭教師の月謝は学習塾費で出せるか'],
+    ['ブランド眼鏡の可否','眼鏡はどこまで認められるか'],
+    ['オンライン授業用の通信機器','高校のオンライン授業に必要な機器を買いたい'],
+    ['定期通院の交通費（毎月）','定期的な通院の交通費を毎月出したい']];
+  var SCHOOLS = ['さいたま小学校','さいたま中学校','さいたま高等学校','市立南小学校','県立浦和高等学校'];
+  var HOSPS = ['〇〇病院','西さいたまクリニック','浦和こどもクリニック','大宮中央歯科'];
+  var STATIONS = [['与野本町駅','中浦和駅'],['北浦和駅','大宮駅'],['武蔵浦和駅','南浦和駅']];
+
+  function makeDetail(cat, amt){
+    var g = 1 + Math.floor(rand() * 6), sc = pick(SCHOOLS), st = pick(STATIONS);
+    switch (cat){
+      case '教材費': return [['学校名', sc],['学年', g + '年'],['内訳', (3 + Math.floor(rand()*12)) + '点'],['対象月','2026年7月']];
+      case '学習塾費・補習費': return [['学習塾名','さいたま学習塾'],['対象月','2026年7月分'],
+        ['授業料', yen(amt * 0.8) + '円'],['通学費', yen(amt * 0.2) + '円']];
+      case '特別育成費': return [['学校名', sc],['課程','私立高校'],['対象月','2026年7月分'],['内訳','授業料・教材費・PTA会費・クラブ費']];
+      case '医療費（交通費）': return [['医療機関', pick(HOSPS)],['乗車区間', st[0] + '〜' + st[1]],
+        ['片道運賃', yen(amt / 2 / (2 + Math.floor(rand()*10))) + '円'],['通院日数', (2 + Math.floor(rand()*10)) + '日']];
+      case '通学費': return [['学校名', sc],['乗車区間', st[0] + '〜' + st[1]],['定期券','6箇月'],['添付','定期券の写し']];
+      case '部活動費': return [['学校名', sc],['部活動名','野球部'],['活動用具', yen(amt*0.9) + '円'],['遠征費等', yen(amt*0.1) + '円']];
+      case '治療材料等給付費': return [['医療機関', pick(HOSPS)],['区分','治療材料（眼鏡）'],['社会保険給付額','0円'],['医師の意見書','あり']];
+      case '幼稚園費': return [['幼稚園名','さいたま幼稚園'],['学年','年中'],['対象月','2026年7月分'],['内訳','保育料・教材費・給食費']];
+      case '見学旅行費': return [['学校名', sc],['行事名','修学旅行'],['期間','2026年9月〇日〜〇日'],['目的地','京都・奈良']];
+      case '自転車等購入費': return [['学校名', sc],['許可','自転車通学許可あり'],['内訳','自転車・ヘルメット'],['購入日','2026年7月〇日']];
+      case '受託支度費': return [['委託年月日','2026年7月〇日'],['内訳','布団・シーツ・肌着・衣類'],['上限','44,630円']];
+      case '資格取得等特別加算費': return [['資格名','英語検定'],['実施者','〇〇協会'],['学年','高校3年'],['上限','57,620円']];
+      case '大学等受験費': return [['受験先','さいたま市立大学'],['受験予定日','2027年2月〇日'],['内訳','受験料・交通費'],['学生支援機構','申請なし']];
+      case 'いとしご育成事業（会補助）': return [['種別','大学'],['受験先','さいたま市立大学'],['受験予定日','2027年2月〇日'],['助成額','定額 30,000円']];
+      default: return [['内容','—']];
+    }
+  }
+
+  var rows = [], seq = 0;
+  CATS.forEach(function(c){
+    for (var i = 0; i < c.n; i++){
+      seq++;
+      var self = (c.who === '里親');
+      var viaLine = self ? (rand() < 0.72) : (rand() < 0.34);
+      var isEx = rand() < 0.15;
+      var isNg = !isEx && rand() < (viaLine ? 0.06 : 0.24);
+      var st = isEx ? '要相談' : isNg ? '不備・差戻し'
+             : rand() < 0.24 ? '未確認' : rand() < 0.22 ? '確認中' : '受理';
+      var ex = isEx ? pick(EX_REASON) : null;
+      var amt = c.lo === c.hi ? c.lo : between(c.lo, c.hi);
+      rows.push({
+        id:'R2608-' + String(seq).padStart(3, '0'),
+        hh:'H' + String(1 + Math.floor(rand() * 80)).padStart(3, '0'),
+        ch:String.fromCharCode(65 + Math.floor(rand() * 26)) + '児',
+        cat:c.cat, form:c.form, who:c.who, amt: amt,
+        src: viaLine ? 'LINE' : '紙・FAX',
+        st: st, ex: ex, ng: isNg ? (viaLine ? pick(NG_LINE) : pick(NG_PAPER)) : '',
+        det: makeDetail(c.cat, amt),
+        att: self ? ['領収書_1.jpg', '領収書_2.jpg'] : [c.who + 'の証明書_写真.jpg']
+      });
+    }
+  });
+
+  var ST_CLASS = {'受理':'p-ok','確認中':'p-mid','不備・差戻し':'p-ng','未確認':'p-new','要相談':'p-ng'};
+  ['未確認','確認中','不備・差戻し','要相談','受理'].forEach(function(s){
+    $('f-status').insertAdjacentHTML('beforeend', '<option>' + s + '</option>'); });
+
+  var LIMIT = 30, limit = LIMIT, selId = null;
+  function narrow(){ return window.innerWidth < 720; }
+
+  function chips(){
+    var t = {}; rows.forEach(function(r){ t[r.st] = (t[r.st] || 0) + 1; });
+    var line = rows.filter(function(r){ return r.src === 'LINE'; }).length;
+    $('chips').innerHTML =
+      '<span class="chip">提出 <b>' + rows.length + '</b> 件</span>' +
+      '<span class="chip">LINE <b>' + line + '</b></span>' +
+      '<span class="chip is-mid">未確認 <b>' + (t['未確認'] || 0) + '</b></span>' +
+      '<span class="chip is-ng">不備 <b>' + (t['不備・差戻し'] || 0) + '</b></span>' +
+      '<span class="chip is-ng">要相談 <b>' + (t['要相談'] || 0) + '</b></span>' +
+      '<span class="chip is-ok">受理 <b>' + (t['受理'] || 0) + '</b></span>';
+  }
+  function filtered(){
+    var s = $('f-status').value, sr = $('f-src').value, onlyEx = $('f-ex').checked;
+    return rows.filter(function(r){
+      return (!s || r.st === s) && (!sr || r.src === sr) && (!onlyEx || r.ex);
+    });
+  }
+  function drawRows(){
+    var list = filtered(), show = narrow() ? list.slice(0, limit) : list;
+    $('count').textContent = list.length + ' 件中 ' + show.length + ' 件を表示';
+    $('more').style.display = (show.length < list.length) ? 'block' : 'none';
+    $('rows').innerHTML = show.map(function(r){
+      var check = r.ex
+        ? '<span style="color:var(--shu);font-weight:700">要相談</span><span class="why">' + esc(r.ex[0]) + '</span>'
+        : r.ng
+          ? '<span style="color:var(--shu);font-weight:700">要確認</span><span class="why">' + esc(r.ng) + '</span>'
+          : (r.src === 'LINE' ? '<span style="color:var(--ok)">異常なし（自動）</span>'
+             : r.proxy ? '<span style="color:var(--ok)">異常なし（入力時に自動）</span>'
+                       : '<span style="color:var(--ink-3)">目視で確認</span>');
+      return '<tr data-id="' + r.id + '"' + (r.id === selId ? ' class="sel"' : '') +
+        '><td class="id" data-l="受付番号">' + r.id + '</td>' +
+        '<td data-l="世帯">' + r.hh + '</td><td data-l="児童">' + r.ch + '</td>' +
+        '<td data-l="費目"><b>' + esc(r.cat) + '</b></td>' +
+        '<td data-l="様式">' + r.form + '<span class="src">（' + r.who + 'が記入）</span></td>' +
+        '<td class="n" data-l="金額">' + yen(r.amt) + ' 円</td>' +
+        '<td data-l="提出">' + r.src + (r.proxy ? '<span class="badge-proxy">代理入力</span>' : '') + '</td>' +
+        '<td data-l="自動チェック">' + check + '</td>' +
+        '<td data-l="状態"><span class="pill ' + ST_CLASS[r.st] + '">' + r.st + '</span></td></tr>';
+    }).join('');
+  }
+  function rowOf(id){ return rows.filter(function(r){ return r.id === id; })[0]; }
+
+  function renderDetail(msg){
+    var r = rowOf(selId);
+    if (!r){
+      $('detail').innerHTML = '<p class="empty">上の一覧から1件タップしてください。ここに中身が出ます。</p>';
+      return;
+    }
+    var h = '<div class="dhead"><h3>' + esc(r.cat) + '</h3><b>' + r.id + '</b></div>' +
+      '<div style="font-size:12.5px;color:var(--ink-3)">' + r.form + '／' + r.who + 'が記入・' + r.src + 'で提出' +
+      (r.proxy ? '<span class="badge-proxy">事務局が代理入力</span>' : '') + '</div>' +
+      '<dl class="dl"><div><dt>世帯</dt><dd>' + r.hh + '</dd></div>' +
+      '<div><dt>児童</dt><dd>' + r.ch + '</dd></div>' +
+      r.det.map(function(d){ return '<div><dt>' + esc(d[0]) + '</dt><dd>' + esc(d[1]) + '</dd></div>'; }).join('') +
+      '<div><dt>請求額</dt><dd><b>' + yen(r.amt) + ' 円</b></dd></div>' +
+      '<div><dt>添付</dt><dd>' + r.att.map(esc).join('<br>') + '</dd></div>' +
+      '<div><dt>状態</dt><dd><span class="pill ' + ST_CLASS[r.st] + '">' + r.st + '</span></dd></div></dl>';
+    if (r.ex){
+      h += '<div class="flag ng">要相談：' + esc(r.ex[0]) + '</div>' +
+           '<div class="flag good" style="margin-top:6px">過去の判断があります<br><b>' + esc(r.ex[1]) + '</b></div>';
+    } else if (r.ng){
+      h += '<div class="flag ng">' + esc(r.ng) + '</div>';
+    } else if (r.proxy){
+      h += '<div class="flag good">FAX・郵送で届いた分を事務局が入力しました。' +
+           '入力後は自動チェック（合計・上限・対象外費目）が通り、月末の集計にも自動で乗ります。</div>';
+    } else {
+      h += '<div class="flag good">自動チェック：異常なし（合計・上限・添付・対象外費目）</div>';
+    }
+    h += '<div class="actions">';
+    if (r.who === '里親') h += '<button class="btn ghost" data-act="sheet">申請書のかたちで見る</button>';
+    else                 h += '<button class="btn ghost" data-act="photo">送られた写真を見る</button>';
+    if (r.st !== '受理')  h += '<button class="btn" data-act="ok">確認完了にする</button>';
+    if (r.st !== '不備・差戻し') h += '<button class="btn ghost" data-act="ng">不備で差し戻す</button>';
+    h += '</div>';
+    if (msg) h += '<div class="toast" style="margin-top:10px">' + esc(msg) + '</div>';
+    $('detail').innerHTML = h;
+  }
+
+  function payAgg(){
+    var m = {}, n = 0, sum = 0;
+    rows.forEach(function(r){
+      if (r.st !== '受理') return;
+      m[r.hh] = (m[r.hh] || 0) + r.amt; n++; sum += r.amt;
+    });
+    return {byHh:m, n:n, sum:sum, hh:Object.keys(m).length};
+  }
+  function drawPay(){
+    var a = payAgg();
+    $('pay-sum').textContent = yen(a.sum) + ' 円';
+    $('pay-n').textContent = '（' + a.n + '件・' + a.hh + '世帯）';
+  }
+  function refresh(msg){ chips(); drawRows(); renderDetail(msg); drawPay(); }
+
+  /* ===== FAX・郵送・持参の代理入力 ===== */
+  (function initProxy(){
+    var hh = '', i;
+    for (i = 1; i <= 80; i++){ var id = 'H' + String(i).padStart(3, '0');
+      hh += '<option' + (i === 7 ? ' selected' : '') + '>' + id + '</option>'; }
+    $('p-hh').innerHTML = hh;
+    var ch = '';
+    for (i = 0; i < 4; i++){ ch += '<option>' + String.fromCharCode(65 + i) + '児</option>'; }
+    $('p-ch').innerHTML = ch;
+    $('p-cat').innerHTML = CATS.map(function(c, k){
+      return '<option value="' + k + '"' + (k === 5 ? ' selected' : '') + '>' +
+        esc(c.cat) + '（' + c.form + '・' + c.who + 'が記入）</option>';
+    }).join('');
+  })();
+
+  $('proxy-toggle').addEventListener('click', function(){
+    var open = $('proxy-form').hidden;
+    $('proxy-form').hidden = !open;
+    this.setAttribute('aria-expanded', String(open));
+    this.textContent = open ? '閉じる' : '開く';
+  });
+
+  $('p-add').addEventListener('click', function(){
+    var c = CATS[+$('p-cat').value];
+    var amt = parseFloat($('p-amt').value) || 0;
+    if (amt <= 0){ $('p-out').innerHTML = '<div class="flag ng">金額を入れてください。</div>'; return; }
+    seq++;
+    var r = {
+      id:'R2608-' + String(seq).padStart(3, '0'),
+      hh:$('p-hh').value, ch:$('p-ch').value,
+      cat:c.cat, form:c.form, who:c.who, amt:amt,
+      src:'紙・FAX', st:'未確認', ex:null, ng:'', proxy:true,
+      det:[['受領方法', $('p-how').value],['受領日', $('p-date').value],
+           ['入力','事務局が代理入力'],['原本','事務局で保管']],
+      att:['（原本を保管中）']
+    };
+    rows.unshift(r);
+    selId = r.id;
+    $('f-status').value = ''; $('f-src').value = ''; $('f-ex').checked = false;
+    limit = LIMIT;
+    refresh();
+    $('p-out').innerHTML = '<div class="toast">' + r.id + ' として一覧に追加しました（' +
+      esc(c.cat) + '・' + yen(amt) + '円）。以降はLINE提出分と同じ扱いになります。</div>';
+    goto('s2-2');
+  });
+
+  $('rows').addEventListener('click', function(e){
+    var tr = e.target.closest('tr[data-id]'); if (!tr) return;
+    selId = tr.dataset.id; refresh(); goto('s2-2');
+  });
+  $('more').addEventListener('click', function(){ limit += LIMIT; drawRows(); });
+  ['f-status','f-src','f-ex'].forEach(function(id){
+    $(id).addEventListener('change', function(){ limit = LIMIT; drawRows(); });
+  });
+
+  $('detail').addEventListener('click', function(e){
+    var b = e.target.closest('[data-act]'); if (!b) return;
+    var r = rowOf(selId); if (!r) return;
+    var act = b.dataset.act;
+    if (act === 'ok'){ r.st = '受理'; refresh('確認完了にしました。振込依頼書の対象に入りました。'); goto('s2-4'); }
+    else if (act === 'ng'){ r.st = '不備・差戻し'; refresh('差し戻しました。里親に通知が届き、画面内で再提出できます。'); }
+    else if (act === 'photo'){ refresh('（見本）押印済みの証明書の写真を表示します。'); }
+    else if (act === 'sheet'){
+      renderA4Doc('a4-2', 'a4-which-2', {
+        form:r.form, title:r.cat + '　申請内容', to:'さいたま市長　宛',
+        sheet:[['受付番号', r.id],['世帯', r.hh],['児童', r.ch]]
+          .concat(r.det).concat([['提出方法', r.src],['添付', r.att.join('／')]]),
+        total:r.amt, attach:'受付側で申請内容を確認するための表示です。'
+      });
+      goto('s2-3');
+    }
+  });
+
+  $('pay-btn').addEventListener('click', function(){
+    var a = payAgg();
+    if (!a.n){ $('pay-out').innerHTML = '<div class="flag ng">確認完了になっている申請がありません。' +
+      '上の一覧から1件選んで「確認完了にする」を押してください。</div>'; return; }
+    var list = Object.keys(a.byHh).sort(), show = list.slice(0, 8);
+    renderA4Doc('a4-2', 'a4-which-2', {
+      form:'（会の内部様式）', title:'措置費　振込依頼書', to:'埼玉縣信用金庫　浦和支店　御中',
+      totalLabel:'振込合計',
+      sheet:[
+        ['支給対象','2026年8月分'],
+        ['支給予定日','2026年9月5日（土日祝の場合はその前の平日）'],
+        ['振込先','埼玉縣信用金庫　浦和支店（全世帯が入会時に届出した口座）'],
+        ['件数・世帯数', a.n + '件／' + a.hh + '世帯'],
+        ['世帯別明細', show.map(function(h){ return h + '　' + yen(a.byHh[h]) + '円'; }).join('\n') +
+          (list.length > show.length ? '\nほか ' + (list.length - show.length) + '世帯' : '')],
+        ['作成','さいたま市里親会事務局　　　　　　　　（印）'],
+        ['確認（複数人チェック）','　　　　　　　　　　　　　　　　（印）']
+      ],
+      total:a.sum,
+      signer:'令和8年8月25日　　さいたま市里親会会長',
+      sealText:'会長<br>之印',
+      attach:'口座番号はこの仕組みでは保有しません。振込先は入会時に届出された既存口座のため、事務局の届出台帳で突合してください。振込の実行は必ず人が行います。'
+    });
+    $('pay-out').innerHTML = '<div class="toast">振込依頼書を作成しました（' + a.n + '件・' + a.hh +
+      '世帯・' + yen(a.sum) + '円）。上の段に出しています。<b>振込の実行は人が行います。</b></div>';
+    goto('s2-3');
+  });
+
+  /* ===== 事例 ===== */
+  var V = {no:['v-no','対象外'], yes:['v-yes','対象'], ask:['v-ask','事前相談']};
+  function drawCases(){
+    var q = $('case-q').value.trim();
+    var list = CASES.filter(function(c){ return !q || (c.q + c.a + c.tags + c.src).indexOf(q) >= 0; });
+    $('case-count').textContent = list.length + ' 件';
+    $('cases').innerHTML = list.map(function(c){
+      return '<div class="case"><div class="q"><span class="verdict ' + V[c.v][0] + '">' + V[c.v][1] +
+        '</span>' + esc(c.q) + '</div><div class="a">' + esc(c.a) + '</div>' +
+        '<div class="meta"><span>根拠：' + esc(c.src) + '</span><span>判断：' + esc(c.by) +
+        '</span><span>' + c.at + '</span></div></div>';
+    }).join('');
+  }
+  $('case-q').addEventListener('input', drawCases);
+
+  var lastNarrow = narrow();
+  window.addEventListener('resize', function(){
+    if (narrow() !== lastNarrow){ lastNarrow = narrow(); limit = LIMIT; drawRows(); }
+  });
+
+  renderForm();
+  refresh();
+  drawCases();
+  fitA4();
+  window.addEventListener('load', fitA4);
+})();
+</script>
