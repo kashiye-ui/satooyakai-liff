@@ -26,37 +26,13 @@
     --on-ai:#ffffff; --on-shu:#ffffff;
     --paper:#ffffff; --paper-ink:#1a2029; --paper-line:#b9c4cf; --paper-shu:#a8332a;
     --shadow:0 1px 2px rgba(20,29,38,.06), 0 8px 24px -16px rgba(20,29,38,.35);
+    /* 端末がダークモードでも常にこの明るい配色で出す（会からの依頼）。
+       ダーク用の定義は置かない。色を足すときは必ずここのトークン経由で。 */
+    color-scheme: light;
     --mono:"SFMono-Regular",Consolas,"Roboto Mono","BIZ UDGothic",monospace;
     --gothic:"Hiragino Kaku Gothic ProN","Yu Gothic UI","Yu Gothic","Noto Sans JP","Meiryo",system-ui,sans-serif;
     --mincho:"Hiragino Mincho ProN","Yu Mincho","YuMincho","Noto Serif JP","MS PMincho",serif;
   }
-  @media (prefers-color-scheme: dark){
-    :root:not([data-theme="light"]){
-      --ground:#10151a; --surface:#171e25; --surface-2:#1e262e;
-      --line:#33414e; --line-soft:#27313a;
-      --ink:#e7edf3; --ink-2:#b3c0cc; --ink-3:#8395a4;
-      --ai:#7fb2dd; --ai-soft:#1b2c3b;
-      --shu:#e08279; --shu-soft:#33201e;
-      --on-ai:#0d1519; --on-shu:#1a0f0e;
-      --ok:#77c9a2; --ok-soft:#162b23;
-      --warn:#dcae5c; --warn-soft:#2c2415;
-      --paper:#e8eaec; --paper-ink:#161c24; --paper-line:#9aa5b1; --paper-shu:#a8332a;
-      --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.9);
-    }
-  }
-  :root[data-theme="dark"]{
-    --ground:#10151a; --surface:#171e25; --surface-2:#1e262e;
-    --line:#33414e; --line-soft:#27313a;
-    --ink:#e7edf3; --ink-2:#b3c0cc; --ink-3:#8395a4;
-    --ai:#7fb2dd; --ai-soft:#1b2c3b;
-    --shu:#e08279; --shu-soft:#33201e;
-    --on-ai:#0d1519; --on-shu:#1a0f0e;
-    --ok:#77c9a2; --ok-soft:#162b23;
-    --warn:#dcae5c; --warn-soft:#2c2415;
-    --paper:#e8eaec; --paper-ink:#161c24; --paper-line:#9aa5b1; --paper-shu:#a8332a;
-    --shadow:0 1px 2px rgba(0,0,0,.4), 0 10px 30px -18px rgba(0,0,0,.9);
-  }
-
   *{box-sizing:border-box}
   body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--gothic);
        font-size:16px;line-height:1.8;-webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
