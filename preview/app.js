@@ -344,6 +344,14 @@ function feeText(e) {
   return `参加費：大人 ${e.adultFee.toLocaleString()}円 / 子ども ${e.childFee.toLocaleString()}円`;
 }
 
+// 多段階料金1区分の単価（FHB×集合場所の2軸。無い組み合わせは基本料金にフォールバック）
+function tierPrice(t, isFHB, isLocal) {
+  if (isLocal && isFHB && t.feeBL != null) return t.feeBL;
+  if (isLocal && t.feeL != null) return t.feeL;
+  if (isFHB && t.feeB != null) return t.feeB;
+  return t.fee;
+}
+
 // 出欠フォームの人数入力欄（多段階 or 2区分）の本文HTMLを返す
 function feeFormBody(ev, cur) {
   cur = cur || {};
@@ -351,13 +359,17 @@ function feeFormBody(ev, cur) {
     const fs = ev.feeSchedule;
     const counts = (cur.breakdown && cur.breakdown.counts) || {};
     const isFHB = cur.breakdown ? !!cur.breakdown.isFHB : false;
+    const isLocal = cur.breakdown ? !!cur.breakdown.isLocal : false;
     const fhbBlock = fs.fhb ? `
       <label class="check"><input type="checkbox" id="fhb" ${isFHB ? 'checked' : ''}> ${escapeHtml(fs.fhbLabel || 'ファミリーホーム')}（料金が変わります）</label>` : '';
+    const localBlock = fs.local ? `
+      <label class="check"><input type="checkbox" id="local" ${isLocal ? 'checked' : ''}> ${escapeHtml(fs.localLabel || '現地集合')}（料金が変わります）</label>` : '';
     const tierInputs = fs.tiers.map(t => `
       <label>${escapeHtml(t.label)} の人数</label>
       <input class="tier-input" data-key="${escapeAttr(t.key)}" type="number" inputmode="numeric" min="0" value="${counts[t.key] != null ? counts[t.key] : 0}">`).join('');
     return `
       ${fhbBlock}
+      ${localBlock}
       ${tierInputs}
       <p class="hint">参加されない区分は 0 のままにしてください。措置児は無料です。</p>
       <div class="card"><p><strong>参加費合計：<span id="fee-total">0</span>円</strong></p></div>`;
@@ -369,20 +381,21 @@ function feeFormBody(ev, cur) {
     <input id="child" type="number" inputmode="numeric" min="0" value="${cur.childCount != null ? cur.childCount : 0}">`;
 }
 
-// 多段階の現在値（合計・区分人数・FHB）を画面から読む
+// 多段階の現在値（合計・区分人数・FHB・集合場所）を画面から読む
 function computeMultiTier(ev) {
   const fs = ev.feeSchedule;
   const isFHB = document.getElementById('fhb') ? document.getElementById('fhb').checked : false;
+  const isLocal = document.getElementById('local') ? document.getElementById('local').checked : false;
   let total = 0; const counts = {};
   document.querySelectorAll('.tier-input').forEach(inp => {
     const key = inp.dataset.key;
     const n = parseInt(inp.value, 10) || 0;
     counts[key] = n;
     const t = fs.tiers.find(x => x.key === key);
-    const price = (isFHB && fs.fhb && t && t.feeB != null) ? t.feeB : (t ? t.fee : 0);
+    const price = t ? tierPrice(t, isFHB && !!fs.fhb, isLocal && !!fs.local) : 0;
     total += n * (Number(price) || 0);
   });
-  return { total, counts, isFHB };
+  return { total, counts, isFHB, isLocal };
 }
 
 // 合計の即時表示を配線する
@@ -395,6 +408,8 @@ function wireFeeInputs(ev) {
   document.querySelectorAll('.tier-input').forEach(i => { i.oninput = update; });
   const fhb = document.getElementById('fhb');
   if (fhb) fhb.onchange = update;
+  const local = document.getElementById('local');
+  if (local) local.onchange = update;
   update();
 }
 
@@ -402,10 +417,10 @@ function wireFeeInputs(ev) {
 function readAttendancePayload(ev) {
   const notes = (document.getElementById('notes').value || '').trim();
   if (isMultiTier(ev)) {
-    const { counts, isFHB } = computeMultiTier(ev);
+    const { counts, isFHB, isLocal } = computeMultiTier(ev);
     const sum = Object.keys(counts).reduce((a, k) => a + (counts[k] || 0), 0);
     if (sum <= 0) { alert('参加する人数を入力してください（欠席の場合はこの行事は申込不要です）。'); return null; }
-    return { eventId: ev.eventId, breakdown: { isFHB, counts }, notes };
+    return { eventId: ev.eventId, breakdown: { isFHB, isLocal, counts }, notes };
   }
   const adultCount = parseInt(document.getElementById('adult').value, 10);
   const childCount = parseInt(document.getElementById('child').value, 10);
@@ -1403,7 +1418,8 @@ function breakdownText(breakdown, feeSchedule) {
   const parts = Object.keys(breakdown.counts)
     .filter(k => breakdown.counts[k] > 0)
     .map(k => `${labels[k] || k}${breakdown.counts[k]}`);
-  return (breakdown.isFHB ? 'FH / ' : '') + parts.join('，');
+  const tags = [breakdown.isFHB ? 'FH' : '', breakdown.isLocal ? '現地' : ''].filter(Boolean).join('/');
+  return (tags ? tags + ' / ' : '') + parts.join('，');
 }
 
 // 代理入力：世帯を選ぶ → 出欠フォーム
