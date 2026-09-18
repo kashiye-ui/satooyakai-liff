@@ -1214,6 +1214,7 @@ function paintAdminEvents() {
 
 // 開催待＝申込は締め切ったが開催はこれから。会員の申込は止まり、代理入力だけできる。
 const EVENT_STATUSES = ['募集中', '開催待', '開催済', '中止'];
+const OFFICER_TITLES = ['', '会長', '副会長', '理事', '監事', '事務局'];
 const EVENT_TARGETS = ['全員', '会員のみ'];
 
 function renderEventForm(ev) {
@@ -1497,11 +1498,13 @@ function drawAdminMembers() {
   const shown = applyTableView(rows, view, cols, searchText);
   const memberCount = rows.filter(r => r.m).length;
 
+  const officerSelect = (m) => `<select class="officer-select" data-uid="${escapeAttr(m.lineUserId)}" style="margin-top:4px;width:auto;padding:2px 6px;font-size:0.8rem;">${OFFICER_TITLES.map(t => `<option value="${escapeAttr(t)}" ${(m.officerTitle || '') === t ? 'selected' : ''}>${t ? escapeHtml(t) : '（役職なし）'}</option>`).join('')}</select>`;
   const adminCell = (m) => {
     const isLine = m.lineUserId && String(m.lineUserId).indexOf('U') === 0;
-    if (m.isFixedAdmin) return '<span class="chip on" style="pointer-events:none;">固定</span>';
-    if (state.isGuest) return m.isAdmin ? '<span class="muted">管理者</span>' : '<span class="muted">—</span>';
-    if (isLine) return `<button class="chip ${m.isAdmin ? 'on' : ''} admin-toggle" data-uid="${escapeAttr(m.lineUserId)}" data-on="${m.isAdmin ? '1' : '0'}" data-name="${escapeAttr(m.name)}">${m.isAdmin ? '管理者' : '管理者にする'}</button>`;
+    const titleSel = (m.isAdmin && !state.isGuest) ? `<br>${officerSelect(m)}` : '';
+    if (m.isFixedAdmin) return `<span class="chip on" style="pointer-events:none;">固定</span>${titleSel}`;
+    if (state.isGuest) return m.isAdmin ? `<span class="muted">管理者${m.officerTitle ? '・' + escapeHtml(m.officerTitle) : ''}</span>` : '<span class="muted">—</span>';
+    if (isLine) return `<button class="chip ${m.isAdmin ? 'on' : ''} admin-toggle" data-uid="${escapeAttr(m.lineUserId)}" data-on="${m.isAdmin ? '1' : '0'}" data-name="${escapeAttr(m.name)}">${m.isAdmin ? '管理者' : '管理者にする'}</button>${titleSel}`;
     return '<span class="muted">—</span>';
   };
   const statusCell = (r) => {
@@ -1536,7 +1539,7 @@ function drawAdminMembers() {
       ${shown.length ? `
         <div class="tbl-wrap"><table class="tbl">
           <thead><tr>
-            ${sortTh('区', 'ku', view)}${sortTh('世帯代表者', 'rep', view)}${sortTh('氏名', 'name', view)}${sortTh('立場', 'role', view)}${sortTh('里親種別', 'foster', view)}${sortTh('会費', 'fee', view)}${sortTh('状態', 'status', view)}<th>管理者</th><th>操作</th>
+            ${sortTh('区', 'ku', view)}${sortTh('世帯代表者', 'rep', view)}${sortTh('氏名', 'name', view)}${sortTh('立場', 'role', view)}${sortTh('里親種別', 'foster', view)}${sortTh('会費', 'fee', view)}${sortTh('状態', 'status', view)}<th>管理者／役員</th><th>操作</th>
           </tr></thead>
           <tbody>${shown.map(trOf).join('')}</tbody>
         </table></div>
@@ -1565,6 +1568,14 @@ function drawAdminMembers() {
       const resp = await callApi('adminSetAdmin', { targetUserId: b.dataset.uid, makeAdmin: make });
       if (resp.ok) { renderAdminHouseholds(); }
       else { alert('変更に失敗しました：' + (resp.error || 'unknown')); b.disabled = false; }
+    };
+  });
+  document.querySelectorAll('select.officer-select').forEach(sel => {
+    sel.onchange = async () => {
+      sel.disabled = true;
+      const resp = await callApi('adminSetOfficerTitle', { targetUserId: sel.dataset.uid, officerTitle: sel.value });
+      if (!resp.ok) { alert('役職の更新に失敗しました：' + (resp.error || 'unknown')); }
+      renderAdminHouseholds();
     };
   });
   document.querySelectorAll('button.approve-btn').forEach(b => {
