@@ -1173,12 +1173,8 @@ function eventAdminCard(e) {
     <div class="card">
       <p><strong>${escapeHtml(e.name)}</strong> ${statusBadge(eventStatusKind(e.status), e.status)} ${e.signup === 'external' ? statusBadge('hold', '外部申込み') : statusBadge('ok', 'LINEにて申込み可')}${e.hasFeeSchedule ? ' <span class="muted">区分別料金</span>' : ''}</p>
       <p class="muted">${escapeHtml(e.date)}${e.place ? ' ／ ' + escapeHtml(e.place) : ''}</p>
-      ${(() => {
-        const counts = e.signup === 'external' ? '' : `${e.counts.households}世帯・大人${e.counts.adults}・子ども${e.counts.children}`;
-        const docs = (e.materials && e.materials.length) ? '📄資料' + e.materials.length + '件' : '';
-        const line = [counts, docs].filter(Boolean).join(' ／ ');
-        return line ? `<p class="muted">${line}</p>` : '';
-      })()}
+      ${e.signup === 'external' ? '' : `<p class="muted">${e.counts.households}世帯・大人${e.counts.adults}・子ども${e.counts.children}</p>`}
+      ${(e.materials && e.materials.length) ? `<div class="docrow">${e.materials.map(d => `<button class="chip evt-doc" data-mid="${escapeAttr(d.id)}">${icon('book')} ${escapeHtml(d.title)}</button>`).join('')}</div>` : ''}
       <div class="actions" style="margin-top:6px;">
         <button class="chip roster-btn" data-id="${escapeAttr(e.eventId)}">${icon('list')}参加者一覧</button>
         <button class="chip ev-edit" data-id="${escapeAttr(e.eventId)}">${icon('edit')}編集</button>
@@ -1206,6 +1202,13 @@ function paintAdminEvents() {
   el.querySelectorAll('button.ev-edit').forEach(b => { b.onclick = () => renderEventForm(byId(b.dataset.id)); });
   el.querySelectorAll('button.ev-notify').forEach(b => {
     b.onclick = () => renderBroadcastCompose({ text: defaultEventNoticeText(byId(b.dataset.id)), back: renderAdminEvents, backLabel: '行事の参加者管理', remember: 'events' });
+  });
+  el.querySelectorAll('button.evt-doc').forEach(b => {
+    b.onclick = async () => {
+      const res = await callApi('materialUrl', { id: b.dataset.mid });
+      if (res.ok && res.url) { openUrl(res.url, true); }
+      else { alert('資料を開けませんでした：' + (res.error || 'unknown')); }
+    };
   });
 }
 
