@@ -1518,7 +1518,7 @@ function drawAdminMembers() {
       <td>${r.m ? escapeHtml(r.name) : '<span class="muted">（会員なし）</span>'}</td>
       <td>${escapeHtml(r.role)}</td>
       <td>${escapeHtml(r.foster)}</td>
-      <td>${escapeHtml(r.fee)}</td>
+      <td>${r.m ? '<span class="muted">準備中</span>' : ''}</td>
       <td>${statusCell(r)}</td>
       <td>${r.m ? adminCell(r.m) : ''}</td>
       <td>${(r.isRep && !state.isGuest) ? `<button class="chip add-member" data-hid="${escapeAttr(r.householdId)}" data-label="${escapeAttr(r.ku + ' ' + r.rep)}">＋家族</button>` : ''}</td>
