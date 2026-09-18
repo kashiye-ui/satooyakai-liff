@@ -1106,6 +1106,7 @@ async function renderAdminHome() {
       <button class="card-btn" id="a-members"><strong>${icon('user')} 会員名簿${state.isGuest ? '' : badge}</strong><span>${state.isGuest ? '世帯・個人の一覧（閲覧）' : '世帯・個人の一覧・承認・LINEなし世帯の代理登録・CSV'}</span></button>
       ${state.isGuest ? '' : `<button class="card-btn muted-btn" id="a-fees"><strong>${icon('money')} 会費の管理（準備中）</strong><span>年会費の納付状況・未納一覧</span></button>`}
       <button class="card-btn" id="a-materials"><strong>${icon('book')} 資料の管理</strong><span>会報・しおり等の追加・公開/非公開</span></button>
+      ${state.isGuest ? '' : `<button class="card-btn" id="a-broadcast"><strong>${icon('send')} お知らせを配信</strong><span>行事・資料に紐づかない一般のお知らせをLINEで配信</span></button>`}
       ${state.isGuest
         ? `<button class="btn back" id="logout-btn" style="margin-top:24px;">${icon('lock')} ログアウト</button>`
         : `<button class="btn back" id="home-btn" style="margin-top:24px;">‹ マイページ</button>`}
@@ -1118,6 +1119,8 @@ async function renderAdminHome() {
   const fb = document.getElementById('a-fees');
   if (fb) fb.onclick = renderAdminFees;
   document.getElementById('a-materials').onclick = renderAdminMaterials;
+  const bb = document.getElementById('a-broadcast');
+  if (bb) bb.onclick = () => renderBroadcastCompose({ text: '', back: renderAdminHome, backLabel: '管理メニュー', remember: null });
   const hb = document.getElementById('home-btn');
   if (hb) hb.onclick = goHome;
   const lb = document.getElementById('logout-btn');
