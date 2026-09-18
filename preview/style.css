@@ -197,6 +197,9 @@ input[type="text"], input[type="tel"], input[type="number"], input:not([type]), 
 .card-btn:nth-of-type(4n+4) { background: var(--lavender-soft); border-left-color: var(--lavender); }
 /* 承認待ちの注意カード（順番色より優先） */
 .card-btn.alert-btn { background: var(--todo-soft); border-left-color: var(--todo); }
+/* 当面運用しない機能（順番色より優先） */
+.card-btn.muted-btn { background: var(--off-soft); border-left-color: var(--off); }
+.card-btn.muted-btn strong { color: var(--off-ink); }
 
 /* ===== カテゴリ色：行き先ごとに固定（順番の循環色より優先） ===== */
 .card-btn.cat-event,

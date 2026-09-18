@@ -1104,7 +1104,7 @@ async function renderAdminHome() {
       ${(pending && !state.isGuest) ? `<button class="card-btn alert-btn" id="a-pending"><strong>${icon('alert')} 承認待ちが ${pending}件あります</strong><span>タップして会員名簿で承認/却下</span></button>` : ''}
       <button class="card-btn" id="a-events"><strong>${icon('calendar')} 行事の参加者管理</strong><span>${state.isGuest ? '行事の作成・編集・参加者名簿の閲覧' : '申込状況・参加費の回収・代理入力・CSV出力'}</span></button>
       <button class="card-btn" id="a-members"><strong>${icon('user')} 会員名簿${state.isGuest ? '' : badge}</strong><span>${state.isGuest ? '世帯・個人の一覧（閲覧）' : '世帯・個人の一覧・承認・LINEなし世帯の代理登録・CSV'}</span></button>
-      ${state.isGuest ? '' : `<button class="card-btn" id="a-fees"><strong>${icon('money')} 会費の管理</strong><span>年会費の納付状況・未納一覧</span></button>`}
+      ${state.isGuest ? '' : `<button class="card-btn muted-btn" id="a-fees"><strong>${icon('money')} 会費の管理</strong><span>準備中（当面は運用しません）</span></button>`}
       <button class="card-btn" id="a-materials"><strong>${icon('book')} 資料の管理</strong><span>会報・しおり等の追加・公開/非公開</span></button>
       ${state.isGuest
         ? `<button class="btn back" id="logout-btn" style="margin-top:24px;">${icon('lock')} ログアウト</button>`
