@@ -432,7 +432,7 @@ async function renderEvents() {
 
   const openCard = (e) => `
     <div class="card">
-      <p><strong>${escapeHtml(e.name)}</strong>${e.signup === 'external' ? ' ' + statusBadge('hold', '案内のみ') : ''}</p>
+      <p><strong>${escapeHtml(e.name)}</strong>${e.signup === 'external' ? ' ' + statusBadge('hold', '外部申込み') : ''}</p>
       <p class="muted">${escapeHtml(e.date)}${e.place ? ' ／ ' + escapeHtml(e.place) : ''}</p>
       <p class="muted">${feeText(e)}${e.deadline ? ' ／ 申込締切 ' + escapeHtml(e.deadline) : ''}</p>
       ${eventDocs(e)}
@@ -1171,9 +1171,14 @@ async function renderAdminEvents() {
 function eventAdminCard(e) {
   return `
     <div class="card">
-      <p><strong>${escapeHtml(e.name)}</strong> ${statusBadge(eventStatusKind(e.status), e.status)}${e.signup === 'external' ? ' ' + statusBadge('hold', '案内のみ') : ''}${e.hasFeeSchedule ? ' <span class="muted">区分別料金</span>' : ''}</p>
+      <p><strong>${escapeHtml(e.name)}</strong> ${statusBadge(eventStatusKind(e.status), e.status)} ${e.signup === 'external' ? statusBadge('hold', '外部申込み') : statusBadge('ok', 'LINEにて申込み可')}${e.hasFeeSchedule ? ' <span class="muted">区分別料金</span>' : ''}</p>
       <p class="muted">${escapeHtml(e.date)}${e.place ? ' ／ ' + escapeHtml(e.place) : ''}</p>
-      <p class="muted">${e.signup === 'external' ? '案内のみ（外部申込）' : `${e.counts.households}世帯・大人${e.counts.adults}・子ども${e.counts.children}`}${(e.materials && e.materials.length) ? ' ／ 📄資料' + e.materials.length + '件' : ''}</p>
+      ${(() => {
+        const counts = e.signup === 'external' ? '' : `${e.counts.households}世帯・大人${e.counts.adults}・子ども${e.counts.children}`;
+        const docs = (e.materials && e.materials.length) ? '📄資料' + e.materials.length + '件' : '';
+        const line = [counts, docs].filter(Boolean).join(' ／ ');
+        return line ? `<p class="muted">${line}</p>` : '';
+      })()}
       <div class="actions" style="margin-top:6px;">
         <button class="chip roster-btn" data-id="${escapeAttr(e.eventId)}">${icon('list')}参加者一覧</button>
         <button class="chip ev-edit" data-id="${escapeAttr(e.eventId)}">${icon('edit')}編集</button>
@@ -2137,6 +2142,6 @@ function statusBadge(kind, label) {
   return `<span class="st ${cls}">${icon(ic)}${escapeHtml(label)}</span>`;
 }
 // 行事の状態 → バッジ種別
-function eventStatusKind(s) { return s === '募集中' ? 'ok' : s === '中止' ? 'off' : 'hold'; }
+function eventStatusKind(s) { return s === '募集中' ? 'ok' : (s === '中止' || s === '開催済') ? 'off' : 'hold'; }
 
 init();
