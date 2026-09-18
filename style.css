@@ -1,20 +1,14 @@
 :root {
-  --primary: #5f9350;       /* 葉の色に寄せた、やわらかい緑（旧：原色のLINE緑） */
-  --primary-dark: #4f7e42;
-  --bg: #fbf7f2;            /* 温かみのあるクリーム */
+  --primary: #35507a;       /* インディゴネイビー */
+  --primary-dark: #283e5f;
+  --primary-soft: #e8edf5;
+  --bg: #fafafa;            /* クリーンな白 */
   --card: #ffffff;
-  --text: #3b322b;          /* 温かみのある濃茶 */
-  --muted: #7a6f63;
-  --border: #e7ddcd;
-  --warn-bg: #fdf3d6;       /* 花の黄に寄せた淡い警告色 */
+  --text: #1e2027;          /* 冷めた墨色 */
+  --muted: #7d818c;
+  --border: #e2e4ea;
+  --warn-bg: #fdf3d6;       /* 警告色（意味づけ・据え置き） */
   --warn-border: #ecd591;
-  /* 淡いアクセント（背景の絵柄＝鳥・花・葉・木の実より） */
-  --pink: #e2918a;     --pink-soft: #fbe9e6;
-  --green: #8fbf78;    --green-soft: #e8f1df;
-  --blue: #93b9dd;     --blue-soft: #e6eff8;
-  --yellow: #e3c069;   --yellow-soft: #fbf2d6;
-  --lavender: #bfa9da; --lavender-soft: #efe9f7;
-  --brown: #5d4037;         /* 木の実のこげ茶（リンク等） */
 
   /* ===== 意味づけした色（セマンティック） ===== */
   /* 状態の色：ものの「いま」を表す。色だけでなくアイコン＋文字も必ず添える。 */
@@ -25,10 +19,10 @@
   --danger: #c0573f; --danger-soft: #f7dcd4; --danger-ink: #a3331c; /* 取消せない操作のみ */
 
   /* カテゴリの色：行き先を表す。場所ごとに固定（順番で変えない）。 */
-  --cat-event: #5f9350;  --cat-event-soft: #e8f1df;  --cat-event-ink: #2f5410;
-  --cat-docs: #9b86c4;   --cat-docs-soft: #efe9f7;   --cat-docs-ink: #4b3b78;
-  --cat-member: #6d97c4; --cat-member-soft: #e6eff8; --cat-member-ink: #1c4a7a;
-  --cat-admin: #8d7355;  --cat-admin-soft: #efe7db;  --cat-admin-ink: #5d4037;
+  --cat-event: #35507a;  --cat-event-soft: #e8edf5;  --cat-event-ink: #22344f;
+  --cat-docs: #35507a;   --cat-docs-soft: #e8edf5;   --cat-docs-ink: #22344f;
+  --cat-member: #5d7290; --cat-member-soft: #eaeef3; --cat-member-ink: #33455c;
+  --cat-admin: #283e5f;  --cat-admin-soft: #e8edf5;  --cat-admin-ink: #1c2d45;
 }
 
 * { box-sizing: border-box; }
@@ -39,19 +33,6 @@ body {
   color: var(--text);
   font-size: 16px;
   line-height: 1.5;
-}
-
-/* 背景の絵柄を、本文の読みやすさを損なわない淡さで全面に敷く */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background-image: url('assets/bg-pattern.png');
-  background-size: 480px;
-  background-repeat: repeat;
-  opacity: 0.10;
-  pointer-events: none;
-  z-index: 0;
 }
 
 #app { min-height: 100vh; position: relative; z-index: 1; }
@@ -67,7 +48,7 @@ h1 {
   margin: 0 0 16px;
   display: inline-block;
   padding-bottom: 4px;
-  border-bottom: 3px solid var(--yellow);
+  border-bottom: 3px solid var(--primary);
 }
 
 h2.sub {
@@ -75,7 +56,7 @@ h2.sub {
   font-weight: 600;
   margin: 20px 0 8px;
   color: var(--primary-dark);
-  border-left: 4px solid var(--green);
+  border-left: 4px solid var(--primary);
   padding-left: 8px;
 }
 
@@ -177,9 +158,9 @@ input[type="text"], input[type="tel"], input[type="number"], input:not([type]), 
   width: 100%;
   text-align: left;
   padding: 12px 14px;
-  background: var(--green-soft);
+  background: var(--card);
   border: 1px solid var(--border);
-  border-left: 5px solid var(--green);
+  border-left: 4px solid var(--primary);
   border-radius: 10px;
   margin-top: 10px;
   cursor: pointer;
@@ -190,35 +171,26 @@ input[type="text"], input[type="tel"], input[type="number"], input:not([type]), 
 .card-btn:active { transform: scale(0.99); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06); }
 .card-btn strong { display: block; font-size: 1rem; margin-bottom: 2px; }
 .card-btn span { display: block; color: var(--muted); font-size: 0.85rem; }
-/* 各ボタンで淡い色を順に変えて華やかに */
-.card-btn:nth-of-type(4n+1) { background: var(--green-soft);    border-left-color: var(--green); }
-.card-btn:nth-of-type(4n+2) { background: var(--pink-soft);     border-left-color: var(--pink); }
-.card-btn:nth-of-type(4n+3) { background: var(--yellow-soft);   border-left-color: var(--yellow); }
-.card-btn:nth-of-type(4n+4) { background: var(--lavender-soft); border-left-color: var(--lavender); }
-/* 承認待ちの注意カード（順番色より優先） */
+/* 承認待ちの注意カード（既定色より優先） */
 .card-btn.alert-btn { background: var(--todo-soft); border-left-color: var(--todo); }
 /* 当面運用しない機能（順番色より優先） */
 .card-btn.muted-btn { background: var(--off-soft); border-left-color: var(--off); }
 .card-btn.muted-btn strong { color: var(--off-ink); }
 
-/* ===== カテゴリ色：行き先ごとに固定（順番の循環色より優先） ===== */
+/* ===== カテゴリ色：行き先ごとに固定（アイコンの丸だけに色を持たせる） ===== */
 .card-btn.cat-event,
 .card-btn.cat-docs,
 .card-btn.cat-member,
-.card-btn.cat-admin { display: flex; align-items: center; gap: 12px; }
-.card-btn.cat-event  { background: var(--cat-event-soft);  border-left-color: var(--cat-event); }
-.card-btn.cat-docs   { background: var(--cat-docs-soft);   border-left-color: var(--cat-docs); }
-.card-btn.cat-member { background: var(--cat-member-soft); border-left-color: var(--cat-member); }
-.card-btn.cat-admin  { background: var(--cat-admin-soft);  border-left-color: var(--cat-admin); }
+.card-btn.cat-admin { display: flex; align-items: center; gap: 12px; background: var(--card); border-left-color: var(--border); }
 .card-btn .cat-ic {
-  flex: 0 0 auto; width: 26px; height: 26px; border-radius: 50%;
-  background: #fff; display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
 }
 .card-btn .cat-tx { flex: 1; }
-.card-btn.cat-event  .cat-ic { color: var(--cat-event); }
-.card-btn.cat-docs   .cat-ic { color: var(--cat-docs); }
-.card-btn.cat-member .cat-ic { color: var(--cat-member); }
-.card-btn.cat-admin  .cat-ic { color: var(--cat-admin); }
+.card-btn.cat-event  .cat-ic { background: var(--cat-event-soft);  color: var(--cat-event); }
+.card-btn.cat-docs   .cat-ic { background: var(--cat-docs-soft);   color: var(--cat-docs); }
+.card-btn.cat-member .cat-ic { background: var(--cat-member-soft); color: var(--cat-member); }
+.card-btn.cat-admin  .cat-ic { background: var(--cat-admin);       color: #fff; }
 .card-btn.cat-event  strong { color: var(--cat-event-ink); }
 .card-btn.cat-docs   strong { color: var(--cat-docs-ink); }
 .card-btn.cat-member strong { color: var(--cat-member-ink); }
@@ -272,13 +244,10 @@ input[type="text"], input[type="tel"], input[type="number"], input:not([type]), 
   color: var(--cat-docs-ink); display: inline-flex; align-items: center; gap: 4px;
 }
 
-/* ===== 管理画面の“すっきりモード”：背景の絵柄をぐっと淡く ===== */
-body.lean::before { opacity: 0.04; }
-
 /* 件数バッジ（承認待ちなど） */
 .badge {
   display: inline-block;
-  background: var(--pink);
+  background: var(--hold);
   color: #fff;
   -webkit-text-fill-color: #fff;
   font-size: 0.75rem;
@@ -288,13 +257,13 @@ body.lean::before { opacity: 0.04; }
   vertical-align: middle;
 }
 
-/* すべてのリンク（自動リンク化された電話番号・URLを含む）をこげ茶に。青文字を出さない。 */
+/* すべてのリンク（自動リンク化された電話番号・URLを含む）を濃紺に。既定の青文字を出さない。 */
 a, a:link, a:visited {
-  color: var(--brown) !important;
-  -webkit-text-fill-color: var(--brown);
+  color: var(--primary-dark) !important;
+  -webkit-text-fill-color: var(--primary-dark);
 }
 .links { padding-left: 1.2em; }
-.links a { color: var(--brown); }
+.links a { color: var(--primary-dark); }
 
 .mono {
   font-family: ui-monospace, "SF Mono", Consolas, monospace;
@@ -315,9 +284,9 @@ a, a:link, a:visited {
   gap: 10px;
   margin: -20px -16px 12px;
   padding: 10px 14px;
-  background: rgba(251, 247, 242, 0.9);
+  background: rgba(250, 250, 250, 0.92);
   backdrop-filter: blur(8px);
-  border-bottom: 2px solid var(--green-soft);
+  border-bottom: 2px solid var(--primary-soft);
 }
 .topbar .back-link {
   flex: 0 0 auto;
@@ -372,7 +341,7 @@ a, a:link, a:visited {
   padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 0.95rem;
 }
 table.tbl th.sortable { cursor: pointer; user-select: none; white-space: nowrap; }
-table.tbl th.sortable:hover { background: #e8e0d2; }
+table.tbl th.sortable:hover { background: #eceef2; }
 
 .tbl-wrap {
   overflow-x: auto;
@@ -391,5 +360,5 @@ table.tbl th, table.tbl td {
   padding: 6px 8px;
   white-space: nowrap;
 }
-table.tbl thead th { background: #f3ede1; }
+table.tbl thead th { background: #f2f3f6; }
 table.tbl td.num { text-align: right; }

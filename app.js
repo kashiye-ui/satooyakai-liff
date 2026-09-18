@@ -1528,7 +1528,7 @@ function drawAdminMembers() {
     <section class="screen wide">
       ${topBar('会員名簿', '管理メニュー')}
       <h1>会員名簿</h1>
-      <p class="muted">${hs.length}世帯・${memberCount}名${pendingCount ? ` ／ <strong style="color:var(--pink);">承認待ち ${pendingCount}件</strong>` : ''}${view.q ? `（表示 ${shown.length}行）` : ''}</p>
+      <p class="muted">${hs.length}世帯・${memberCount}名${pendingCount ? ` ／ <strong style="color:var(--hold-ink);">承認待ち ${pendingCount}件</strong>` : ''}${view.q ? `（表示 ${shown.length}行）` : ''}</p>
       <div class="toolbar">
         <input class="search-input" id="tbl-search" type="search" placeholder="区・氏名・里親種別などで検索…" value="${escapeAttr(view.q)}">
         ${state.isGuest ? '' : '<button class="btn" id="new-h-btn" style="flex:0 0 auto;">＋ LINEなし世帯を登録</button>'}
