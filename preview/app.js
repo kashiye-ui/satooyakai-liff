@@ -1318,6 +1318,7 @@ async function renderAdminRoster(eventId) {
 // state.adminRoster をもとに名簿を描画する（支払トグルの即時反映に使う）
 function drawAdminRoster() {
   const { eventId, event, rows, view } = state.adminRoster;
+  const isExternal = event.signup === 'external';
   const hasFee = rows.some(r => r.total > 0);
 
   // 回収集計（全件ベース。参加費が発生する行事のみ意味がある）
@@ -1348,7 +1349,9 @@ function drawAdminRoster() {
             ? `<span class="st ${r.payStatus === '済' ? 'st-ok' : 'st-todo'}">${icon(r.payStatus === '済' ? 'check' : 'alert')}${r.payStatus === '済' ? '済' : '未'}</span>`
             : `<button class="chip ${r.payStatus === '済' ? 'on' : 'off'} pay-toggle" data-id="${escapeAttr(r.householdId)}">${r.payStatus === '済' ? '済' : '未'}</button>`)
         : '<span class="muted">—</span>'}</td>
-      <td>${state.isGuest ? '' : `<button class="chip edit-att" data-id="${escapeAttr(r.householdId)}">編集</button>`}</td>
+      <td>${state.isGuest ? '' : (isExternal
+        ? `<button class="chip" disabled title="外部申込みの行事のため編集できません">編集</button>`
+        : `<button class="chip edit-att" data-id="${escapeAttr(r.householdId)}">編集</button>`)}</td>
     </tr>`).join('');
 
   $app.innerHTML = `
@@ -1369,7 +1372,9 @@ function drawAdminRoster() {
         <button class="btn primary" id="csv-btn" style="margin-top:8px;">CSVをダウンロード（全件）</button>
         <p class="hint">ダウンロードはPCのブラウザ推奨です。</p>
       ` : '<p class="muted">該当する回答がありません。</p>'}
-      ${state.isGuest ? '' : '<button class="btn" id="proxy-btn" style="margin-top:8px;">LINEなし世帯を代理で入力</button>'}
+      ${state.isGuest ? '' : (isExternal
+        ? '<button class="btn" disabled style="margin-top:8px;">LINEなし世帯を代理で入力</button><p class="hint">外部申込みの行事のため、会は参加者を把握できません（案内のみ）。</p>'
+        : '<button class="btn" id="proxy-btn" style="margin-top:8px;">LINEなし世帯を代理で入力</button>')}
       <button class="btn back" id="back-btn" style="margin-top:8px;">‹ 行事一覧</button>
     </section>
   `;
