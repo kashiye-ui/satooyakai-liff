@@ -1101,6 +1101,7 @@ async function renderAdmin() {
     if (sec.name === 'materials') return renderAdminMaterials();
     if (sec.name === 'events') return renderAdminEvents();
     if (sec.name === 'roster' && sec.param) return renderAdminRoster(sec.param);
+    if (sec.name === 'botlog') return renderAdminBotLog();
   }
   return renderAdminHome();
 }
@@ -1122,6 +1123,7 @@ async function renderAdminHome() {
       ${state.isGuest ? '' : `<button class="card-btn muted-btn" id="a-fees"><strong>${icon('money')} 会費の管理（準備中）</strong><span>年会費の納付状況・未納一覧</span></button>`}
       <button class="card-btn" id="a-materials"><strong>${icon('book')} 資料の管理</strong><span>会報・しおり等の追加・公開/非公開</span></button>
       ${state.isGuest ? '' : `<button class="card-btn" id="a-broadcast"><strong>${icon('send')} お知らせを配信</strong><span>行事・資料に紐づかない一般のお知らせをLINEで配信</span></button>`}
+      ${state.isGuest ? '' : `<button class="card-btn" id="a-botlog"><strong>${icon('bell')} Q&Aボットのログ</strong><span>会員がボットに聞いた質問・回答の履歴</span></button>`}
       ${state.isGuest
         ? `<button class="btn back" id="logout-btn" style="margin-top:24px;">${icon('lock')} ログアウト</button>`
         : `<button class="btn back" id="home-btn" style="margin-top:24px;">‹ マイページ</button>`}
@@ -1136,6 +1138,8 @@ async function renderAdminHome() {
   document.getElementById('a-materials').onclick = renderAdminMaterials;
   const bb = document.getElementById('a-broadcast');
   if (bb) bb.onclick = () => renderBroadcastCompose({ text: '', back: renderAdminHome, backLabel: '管理メニュー', remember: null });
+  const blb = document.getElementById('a-botlog');
+  if (blb) blb.onclick = renderAdminBotLog;
   const hb = document.getElementById('home-btn');
   if (hb) hb.onclick = goHome;
   const lb = document.getElementById('logout-btn');
@@ -1425,6 +1429,69 @@ function breakdownText(breakdown, feeSchedule) {
     .map(k => `${labels[k] || k}${breakdown.counts[k]}`);
   const tags = [breakdown.isFHB ? 'FH' : '', breakdown.isLocal ? '現地' : ''].filter(Boolean).join('/');
   return (tags ? tags + ' / ' : '') + parts.join('，');
+}
+
+// ===== 画面: Q&Aボットのログ =====
+const BOT_STATUS_LABELS = { answered: '回答済み', not_member: '未登録', soft_launch_blocked: '準備中(非公開)', error: 'エラー' };
+function botStatusBadge(status) {
+  const kindMap = { answered: 'ok', not_member: 'hold', soft_launch_blocked: 'off', error: 'danger' };
+  return statusBadge(kindMap[status] || 'off', BOT_STATUS_LABELS[status] || status || '');
+}
+
+async function renderAdminBotLog() {
+  rememberAdmin('botlog');
+  $app.innerHTML = `<section class="screen"><h1>Q&Aボットのログ</h1><p>読み込み中...</p></section>`;
+  const res = await callApi('adminBotLog', { limit: 100 });
+  if (!res.ok) return renderActionError('Q&Aボットのログ', res.error);
+  const prevView = (state.adminBotLog && state.adminBotLog.view) || { q: '', sortKey: 'created_at', sortDir: 'desc' };
+  state.adminBotLog = { rows: res.rows || [], view: prevView };
+  drawAdminBotLog();
+}
+
+function drawAdminBotLog() {
+  const { rows, view } = state.adminBotLog;
+  const cols = { created_at: r => r.created_at, question: r => r.question, status: r => r.status };
+  const searchText = r => `${r.question} ${r.answer} ${r.line_user_id}`;
+  const shown = applyTableView(rows, view, cols, searchText);
+  const trs = shown.map(r => {
+    const short = (r.answer || '').length > 60 ? r.answer.slice(0, 60) + '…' : (r.answer || '');
+    return `<tr>
+      <td>${escapeHtml(r.created_at || '')}</td>
+      <td>${escapeHtml(r.question || '')}</td>
+      <td>${escapeHtml(short)}</td>
+      <td>${botStatusBadge(r.status)}</td>
+    </tr>`;
+  }).join('');
+  $app.innerHTML = `
+    <section class="screen wide">
+      ${topBar('Q&Aボットのログ', '管理メニュー')}
+      <h1>${icon('bell')} Q&Aボットのログ</h1>
+      <p class="muted">直近${rows.length}件${view.q ? `（表示 ${shown.length}）` : ''}</p>
+      <div class="toolbar">
+        <input class="search-input" id="tbl-search" type="search" placeholder="質問・回答・LINE IDで検索…" value="${escapeAttr(view.q)}">
+      </div>
+      ${shown.length ? `
+        <div class="tbl-wrap"><table class="tbl">
+          <thead><tr>${sortTh('日時', 'created_at', view)}${sortTh('質問', 'question', view)}<th>回答（抜粋）</th>${sortTh('状態', 'status', view)}</tr></thead>
+          <tbody>${trs}</tbody>
+        </table></div>
+        <p class="hint">見出しクリックで並べ替え。</p>
+        <button class="btn primary" id="csv-btn" style="margin-top:8px;">CSVをダウンロード</button>
+      ` : '<p class="muted">まだ記録がありません。</p>'}
+      <button class="btn back" id="back-btn" style="margin-top:24px;">‹ 管理メニュー</button>
+    </section>
+  `;
+  document.getElementById('topback').onclick = renderAdminHome;
+  document.getElementById('back-btn').onclick = renderAdminHome;
+  wireTableControls(view, drawAdminBotLog);
+  const csvBtn = document.getElementById('csv-btn');
+  if (csvBtn) {
+    csvBtn.onclick = () => {
+      const header = ['日時', 'LINEユーザーID', '質問', '回答', '状態'];
+      const data = rows.map(r => [r.created_at, r.line_user_id, r.question, r.answer, BOT_STATUS_LABELS[r.status] || r.status]);
+      downloadCsv('bot_log.csv', [header].concat(data));
+    };
+  }
 }
 
 // 代理入力：世帯を選ぶ → 出欠フォーム
@@ -2176,7 +2243,7 @@ function icon(name, cls) {
 
 // 状態バッジ（色＋アイコン＋文字の三点で伝える）。kind: ok/todo/hold/off
 function statusBadge(kind, label) {
-  const map = { ok: ['st-ok', 'check'], todo: ['st-todo', 'alert'], hold: ['st-hold', 'clock'], off: ['st-off', 'ban'] };
+  const map = { ok: ['st-ok', 'check'], todo: ['st-todo', 'alert'], hold: ['st-hold', 'clock'], off: ['st-off', 'ban'], danger: ['st-danger', 'alert'] };
   const [cls, ic] = map[kind] || map.off;
   return `<span class="st ${cls}">${icon(ic)}${escapeHtml(label)}</span>`;
 }
