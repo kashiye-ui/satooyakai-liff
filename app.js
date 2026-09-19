@@ -34,6 +34,7 @@ const state = {
   isGuest: false,      // ゲスト（児相・共有パスコード）でログイン中か
   matView: { q: '', filter: 'all', sort: 'date' },   // 資料の絞り込み・並べ替え
   evtView: { q: '', filter: 'all', sort: 'date' },   // 行事の絞り込み・並べ替え
+  botLogView: { q: '', filter: 'all', sort: 'date' }, // Q&Aボットログの絞り込み・並べ替え
 };
 
 // ===== 一覧の検索＋絞り込みチップ＋並べ替えバー（資料・行事で共用） =====
@@ -1441,57 +1442,69 @@ function botStatusBadge(status) {
 async function renderAdminBotLog() {
   rememberAdmin('botlog');
   $app.innerHTML = `<section class="screen"><h1>Q&Aボットのログ</h1><p>読み込み中...</p></section>`;
-  const res = await callApi('adminBotLog', { limit: 100 });
+  const res = await callApi('adminBotLog', { limit: 200 });
   if (!res.ok) return renderActionError('Q&Aボットのログ', res.error);
-  const prevView = (state.adminBotLog && state.adminBotLog.view) || { q: '', sortKey: 'created_at', sortDir: 'desc' };
-  state.adminBotLog = { rows: res.rows || [], view: prevView };
-  drawAdminBotLog();
-}
-
-function drawAdminBotLog() {
-  const { rows, view } = state.adminBotLog;
-  const cols = { created_at: r => r.created_at, question: r => r.question, status: r => r.status };
-  const searchText = r => `${r.question} ${r.answer} ${r.line_user_id}`;
-  const shown = applyTableView(rows, view, cols, searchText);
-  const trs = shown.map(r => {
-    const short = (r.answer || '').length > 60 ? r.answer.slice(0, 60) + '…' : (r.answer || '');
-    return `<tr>
-      <td>${escapeHtml(r.created_at || '')}</td>
-      <td>${escapeHtml(r.question || '')}</td>
-      <td>${escapeHtml(short)}</td>
-      <td>${botStatusBadge(r.status)}</td>
-    </tr>`;
-  }).join('');
+  state.adminBotLog = res.rows || [];
+  const v = state.botLogView;
+  const controls = listControlsHtml({
+    view: v,
+    placeholder: '質問・回答で検索…',
+    filters: [
+      { key: 'all', label: 'すべて' },
+      { key: 'answered', label: '回答済み' },
+      { key: 'soft_launch_blocked', label: '準備中扱い' },
+      { key: 'not_member', label: '未登録' },
+      { key: 'error', label: 'エラー' },
+    ],
+    sorts: [
+      { key: 'date', label: '新しい順' },
+      { key: 'date-asc', label: '古い順' },
+    ],
+  });
   $app.innerHTML = `
-    <section class="screen wide">
+    <section class="screen">
       ${topBar('Q&Aボットのログ', '管理メニュー')}
       <h1>${icon('bell')} Q&Aボットのログ</h1>
-      <p class="muted">直近${rows.length}件${view.q ? `（表示 ${shown.length}）` : ''}</p>
-      <div class="toolbar">
-        <input class="search-input" id="tbl-search" type="search" placeholder="質問・回答・LINE IDで検索…" value="${escapeAttr(view.q)}">
-      </div>
-      ${shown.length ? `
-        <div class="tbl-wrap"><table class="tbl">
-          <thead><tr>${sortTh('日時', 'created_at', view)}${sortTh('質問', 'question', view)}<th>回答（抜粋）</th>${sortTh('状態', 'status', view)}</tr></thead>
-          <tbody>${trs}</tbody>
-        </table></div>
-        <p class="hint">見出しクリックで並べ替え。</p>
-        <button class="btn primary" id="csv-btn" style="margin-top:8px;">CSVをダウンロード</button>
-      ` : '<p class="muted">まだ記録がありません。</p>'}
-      <button class="btn back" id="back-btn" style="margin-top:24px;">‹ 管理メニュー</button>
+      <p class="muted">質問・回答は省略せず全文表示しています。誤った回答が無いか確認する際にお使いください。</p>
+      ${controls}
+      <div id="botlog-list"></div>
+      <button class="btn primary" id="csv-btn" style="margin-top:8px;">CSVをダウンロード（全件）</button>
+      <button class="btn back" id="back-btn" style="margin-top:8px;">‹ 管理メニュー</button>
     </section>
   `;
   document.getElementById('topback').onclick = renderAdminHome;
   document.getElementById('back-btn').onclick = renderAdminHome;
-  wireTableControls(view, drawAdminBotLog);
-  const csvBtn = document.getElementById('csv-btn');
-  if (csvBtn) {
-    csvBtn.onclick = () => {
-      const header = ['日時', 'LINEユーザーID', '質問', '回答', '状態'];
-      const data = rows.map(r => [r.created_at, r.line_user_id, r.question, r.answer, BOT_STATUS_LABELS[r.status] || r.status]);
-      downloadCsv('bot_log.csv', [header].concat(data));
-    };
-  }
+  wireListControls({ view: v, onChange: paintAdminBotLog });
+  document.getElementById('csv-btn').onclick = () => {
+    const header = ['日時', 'LINEユーザーID', '質問', '回答', '状態'];
+    const data = (state.adminBotLog || []).map(r => [r.created_at, r.line_user_id, r.question, r.answer, BOT_STATUS_LABELS[r.status] || r.status]);
+    downloadCsv('bot_log.csv', [header].concat(data));
+  };
+  paintAdminBotLog();
+}
+
+function paintAdminBotLog() {
+  const v = state.botLogView;
+  let list = (state.adminBotLog || []).filter(r => {
+    if (v.filter !== 'all' && r.status !== v.filter) return false;
+    return matchQuery(v.q, `${r.question} ${r.answer}`);
+  });
+  list = list.slice().sort((a, b) => {
+    const c = (a.created_at || '').localeCompare(b.created_at || '');
+    return v.sort === 'date-asc' ? c : -c;
+  });
+  const el = document.getElementById('botlog-list');
+  if (!el) return;
+  el.innerHTML = list.length ? list.map(botLogCard).join('') : '<p class="muted">該当する記録がありません。</p>';
+}
+
+function botLogCard(r) {
+  return `
+    <div class="card">
+      <p>${botStatusBadge(r.status)} <span class="muted">${escapeHtml(r.created_at || '')}</span></p>
+      <p><strong>Q. ${escapeHtml(r.question || '')}</strong></p>
+      <p style="white-space:pre-wrap;">${r.answer ? escapeHtml(r.answer) : '<span class="muted">（回答なし）</span>'}</p>
+    </div>`;
 }
 
 // 代理入力：世帯を選ぶ → 出欠フォーム
