@@ -2001,7 +2001,7 @@ async function renderBroadcastCompose(opts) {
   };
 }
 
-const MATERIAL_CATEGORIES = ['イベント', '会報', '総会資料', 'Q&A', 'その他'];
+const MATERIAL_CATEGORIES = ['イベント', '会報', '総会資料', 'Q&A', '支援・寄贈情報', 'その他'];
 
 // カテゴリ別の色（淡い地＋濃い文字）。未知カテゴリは「その他」色。
 const CATEGORY_COLORS = {
@@ -2009,13 +2009,14 @@ const CATEGORY_COLORS = {
   '会報': ['var(--cat-member-soft)', 'var(--cat-member-ink)'],
   '総会資料': ['var(--cat-docs-soft)', 'var(--cat-docs-ink)'],
   'Q&A': ['var(--hold-soft)', 'var(--hold-ink)'],
+  '支援・寄贈情報': ['var(--cat-admin-soft)', 'var(--cat-admin-ink)'],
   'その他': ['var(--off-soft)', 'var(--off-ink)'],
 };
 function categoryChip(cat) {
   const c = CATEGORY_COLORS[cat] || CATEGORY_COLORS['その他'];
   return `<span class="catchip" style="background:${c[0]};color:${c[1]}">${escapeHtml(cat || 'その他')}</span>`;
 }
-const CATEGORY_ICONS = { 'イベント': 'calendar', '会報': 'book', '総会資料': 'list', 'Q&A': 'bell', 'その他': 'book' };
+const CATEGORY_ICONS = { 'イベント': 'calendar', '会報': 'book', '総会資料': 'list', 'Q&A': 'bell', '支援・寄贈情報': 'money', 'その他': 'book' };
 function categoryIcon(cat) { return CATEGORY_ICONS[cat] || 'book'; }
 // 直近 NEW_DAYS 日以内に登録/公開された資料は「NEW」
 const NEW_DAYS = 31;
