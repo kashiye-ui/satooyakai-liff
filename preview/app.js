@@ -1448,7 +1448,7 @@ async function renderAdminBotLog() {
   const v = state.botLogView;
   const controls = listControlsHtml({
     view: v,
-    placeholder: '質問・回答で検索…',
+    placeholder: '質問・回答・質問者で検索…',
     filters: [
       { key: 'all', label: 'すべて' },
       { key: 'answered', label: '回答済み' },
@@ -1476,18 +1476,25 @@ async function renderAdminBotLog() {
   document.getElementById('back-btn').onclick = renderAdminHome;
   wireListControls({ view: v, onChange: paintAdminBotLog });
   document.getElementById('csv-btn').onclick = () => {
-    const header = ['日時', 'LINEユーザーID', '質問', '回答', '状態'];
-    const data = (state.adminBotLog || []).map(r => [r.created_at, r.line_user_id, r.question, r.answer, BOT_STATUS_LABELS[r.status] || r.status]);
+    const header = ['日時', '質問者', 'LINEユーザーID', '質問', '回答', '状態'];
+    const data = (state.adminBotLog || []).map(r => [r.created_at, botLogWho(r), r.line_user_id, r.question, r.answer, BOT_STATUS_LABELS[r.status] || r.status]);
     downloadCsv('bot_log.csv', [header].concat(data));
   };
   paintAdminBotLog();
+}
+
+// 質問者の表示名（会員なら「区 氏名（立場）」、未登録なら明示）
+function botLogWho(r) {
+  if (!r.member_name) return '未登録の方';
+  const role = (r.member_role && r.member_role !== '世帯代表者') ? `（${r.member_role}）` : '';
+  return `${r.ku ? r.ku + ' ' : ''}${r.member_name}${role}`;
 }
 
 function paintAdminBotLog() {
   const v = state.botLogView;
   let list = (state.adminBotLog || []).filter(r => {
     if (v.filter !== 'all' && r.status !== v.filter) return false;
-    return matchQuery(v.q, `${r.question} ${r.answer}`);
+    return matchQuery(v.q, `${r.question} ${r.answer} ${botLogWho(r)}`);
   });
   list = list.slice().sort((a, b) => {
     const c = (a.created_at || '').localeCompare(b.created_at || '');
@@ -1502,6 +1509,7 @@ function botLogCard(r) {
   return `
     <div class="card">
       <p>${botStatusBadge(r.status)} <span class="muted">${escapeHtml(r.created_at || '')}</span></p>
+      <p class="muted">質問者: ${escapeHtml(botLogWho(r))}</p>
       <p><strong>Q. ${escapeHtml(r.question || '')}</strong></p>
       <p style="white-space:pre-wrap;">${r.answer ? escapeHtml(r.answer) : '<span class="muted">（回答なし）</span>'}</p>
     </div>`;
