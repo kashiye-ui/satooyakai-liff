@@ -1433,9 +1433,9 @@ function breakdownText(breakdown, feeSchedule) {
 }
 
 // ===== 画面: Q&Aボットのログ =====
-const BOT_STATUS_LABELS = { answered: '回答済み', not_member: '未登録', soft_launch_blocked: '準備中(非公開)', error: 'エラー' };
+const BOT_STATUS_LABELS = { answered: '回答済み', not_member: '未登録', soft_launch_blocked: '準備中(非公開)', error: 'エラー', undelivered: '未達(要フォロー)' };
 function botStatusBadge(status) {
-  const kindMap = { answered: 'ok', not_member: 'hold', soft_launch_blocked: 'off', error: 'danger' };
+  const kindMap = { answered: 'ok', not_member: 'hold', soft_launch_blocked: 'off', error: 'danger', undelivered: 'danger' };
   return statusBadge(kindMap[status] || 'off', BOT_STATUS_LABELS[status] || status || '');
 }
 
@@ -1451,6 +1451,7 @@ async function renderAdminBotLog() {
     placeholder: '質問・回答・質問者で検索…',
     filters: [
       { key: 'all', label: 'すべて' },
+      { key: 'undelivered', label: '未達' },
       { key: 'answered', label: '回答済み' },
       { key: 'soft_launch_blocked', label: '準備中扱い' },
       { key: 'not_member', label: '未登録' },
