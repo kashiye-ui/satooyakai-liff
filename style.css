@@ -152,6 +152,10 @@ input[type="text"], input[type="tel"], input[type="number"], input:not([type]), 
   background: var(--warn-bg);
   border-color: var(--warn-border);
 }
+.card.ok {
+  background: var(--ok-soft);
+  border-color: var(--ok);
+}
 
 .card-btn {
   display: block;

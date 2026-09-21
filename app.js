@@ -1503,16 +1503,123 @@ function paintAdminBotLog() {
   const el = document.getElementById('botlog-list');
   if (!el) return;
   el.innerHTML = list.length ? list.map(botLogCard).join('') : '<p class="muted">該当する記録がありません。</p>';
+  document.querySelectorAll('button.bot-reply-btn').forEach(b => {
+    b.onclick = () => {
+      const row = (state.adminBotLog || []).find(x => String(x.id) === b.dataset.id);
+      if (row) renderBotLogReply(row);
+    };
+  });
 }
 
 function botLogCard(r) {
+  const replied = r.replied_at ? `
+    <div class="card ok" style="margin-top:6px;">
+      <p class="muted">事務局からの回答済み（${escapeHtml(r.replied_at)}）</p>
+      <p style="white-space:pre-wrap;">${escapeHtml(r.reply_text || '')}</p>
+    </div>` : '';
   return `
     <div class="card">
       <p>${botStatusBadge(r.status)} <span class="muted">${escapeHtml(r.created_at || '')}</span></p>
       <p class="muted">質問者: ${escapeHtml(botLogWho(r))}</p>
       <p><strong>Q. ${escapeHtml(r.question || '')}</strong></p>
       <p style="white-space:pre-wrap;">${r.answer ? escapeHtml(r.answer) : '<span class="muted">（回答なし）</span>'}</p>
+      ${replied}
+      <button class="btn primary bot-reply-btn" data-id="${escapeAttr(r.id)}" style="margin-top:8px;">${r.replied_at ? '追記して回答し直す' : '事務局から回答する'}</button>
     </div>`;
+}
+
+// クリップボードへコピー（Clipboard API不可の環境向けにexecCommandへフォールバック）
+async function copyToClipboard(text) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (e) { /* フォールバックへ */ }
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+// 理事に確認してもらう用に「質問＋Botの回答＋事務局の回答案」をひとまとめにした文面
+function botLogConfirmText(r, draft) {
+  const lines = [
+    'こんな質問がBotに来ました。この回答でよいか確認をお願いします。',
+    '',
+    `質問者：${botLogWho(r)}`,
+    `Q. ${r.question || ''}`,
+    `Botの回答：${r.answer || '（回答なし）'}`,
+    '',
+    '事務局からの回答案：',
+    draft ? draft : '（まだ作成していません）',
+  ];
+  return lines.join('\n');
+}
+
+// Botの回答が不十分だった質問に、事務局から個別に補足回答を送る画面
+async function renderBotLogReply(r) {
+  rememberAdmin('botlog');
+  $app.innerHTML = `
+    <section class="screen">
+      ${topBar('回答を送る', 'Q&Aボットのログ')}
+      <h1>${icon('bell')} 回答を送る</h1>
+      <div class="card">
+        <p class="muted">質問者: ${escapeHtml(botLogWho(r))}</p>
+        <p><strong>Q. ${escapeHtml(r.question || '')}</strong></p>
+        <p class="muted" style="white-space:pre-wrap;">Botの回答：${r.answer ? escapeHtml(r.answer) : '（回答なし）'}</p>
+      </div>
+      ${r.replied_at ? `
+      <div class="card ok">
+        <p class="muted">前回送った回答（${escapeHtml(r.replied_at)}）</p>
+        <p style="white-space:pre-wrap;">${escapeHtml(r.reply_text || '')}</p>
+      </div>` : ''}
+      <label>この方のLINEに個別に送る回答文 <span class="req">*</span></label>
+      <textarea id="reply-text" rows="8" style="width:100%;box-sizing:border-box;"></textarea>
+      <p class="hint">送信すると、この方のトークに事務局からのメッセージとして届きます（無料配信枠を1通消費。友だち解除・非友だちの場合は届きません）。</p>
+      <div class="actions">
+        <button class="btn" id="copy-btn" type="button">質問＋回答案をコピー（理事に確認用）</button>
+      </div>
+      <div class="actions">
+        <button class="btn back" id="back-btn">‹ Q&Aボットのログ</button>
+        <button class="btn primary" id="send-btn">この内容で送る</button>
+      </div>
+    </section>
+  `;
+  document.getElementById('topback').onclick = renderAdminBotLog;
+  document.getElementById('back-btn').onclick = renderAdminBotLog;
+  document.getElementById('copy-btn').onclick = async () => {
+    const draft = document.getElementById('reply-text').value.trim();
+    const btn = document.getElementById('copy-btn');
+    const done = await copyToClipboard(botLogConfirmText(r, draft));
+    btn.textContent = done ? 'コピーしました！理事のトーク等に貼り付けてください' : 'コピーできませんでした';
+    setTimeout(() => { btn.textContent = '質問＋回答案をコピー（理事に確認用）'; }, 3000);
+  };
+  document.getElementById('send-btn').onclick = async () => {
+    const text = document.getElementById('reply-text').value.trim();
+    if (!text) { alert('回答文を入力してください。'); return; }
+    if (!confirm(`${botLogWho(r)} さんのLINEに個別にメッセージを送ります。よろしいですか？`)) return;
+    const btn = document.getElementById('send-btn');
+    btn.disabled = true; btn.textContent = '送信中...';
+    const res = await callApi('adminBotLogReply', { id: r.id, text });
+    if (res.ok && res.sent) {
+      alert('送信しました。');
+      renderAdminBotLog();
+    } else {
+      const msg = !res.ok ? (res.error || 'unknown') : '送信できませんでした（友だち解除、または非友だちの可能性があります）。';
+      alert('送信に失敗しました：' + msg);
+      btn.disabled = false; btn.textContent = 'この内容で送る';
+    }
+  };
 }
 
 // 代理入力：世帯を選ぶ → 出欠フォーム
