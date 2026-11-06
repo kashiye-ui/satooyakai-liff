@@ -584,7 +584,7 @@ async function renderDocs() {
       ${groups[cat].map(m => `
         <button class="card-btn cat-docs doc-link" data-id="${escapeAttr(m.id)}" style="background:${c[0]};border-left-color:${c[1]}">
           <span class="cat-ic" style="color:${c[1]}">${icon(ic, 'ic-lg')}</span>
-          <span class="cat-tx"><strong style="color:${c[1]}">${escapeHtml(m.title)}</strong>${isNewMaterial(m) ? ' ' + newBadge() : ''}<span>${escapeHtml(m.publishedAt || '')}</span></span>
+          <span class="cat-tx" style="--accent:${c[1]}"><strong style="color:${c[1]}">${escapeHtml(m.title)}</strong><span>${escapeHtml(m.publishedAt || '')}${isNewMaterial(m) ? newBadge() : ''}</span></span>
         </button>`).join('')}`;
     }).join('');
   }
@@ -2020,7 +2020,7 @@ function materialCard(m) {
   const isPub = m.status === '公開';
   return `
     <div class="card${isPub ? '' : ' warn'}">
-      <p><strong>${escapeHtml(m.title)}</strong>${isNewMaterial(m) ? ' ' + newBadge() : ''}</p>
+      <p><strong>${escapeHtml(m.title)}</strong>${isNewMaterial(m) ? newBadge() : ''}</p>
       <p>${categoryChip(m.category)} <span class="muted">${m.isFile ? '📎アップロード' : 'リンク'}・${escapeHtml(m.publishedAt || '')}</span>${m.eventName ? ` <span class="muted">／🔗 ${escapeHtml(m.eventName)}</span>` : ''}</p>
       <p class="muted" style="word-break:break-all;">${m.isFile ? '（Cloudflareに保管・認証配信）' : escapeHtml(m.url)}</p>
       <div class="actions" style="margin-top:6px;">
