@@ -569,23 +569,18 @@ async function renderDocs() {
   if (!mats.length) {
     body = '<p class="muted">現在、公開されている資料はありません。</p>';
   } else {
-    const groups = {};
-    mats.forEach(m => { (groups[m.category || 'その他'] = groups[m.category || 'その他'] || []).push(m); });
-    // カテゴリ順（イベント→会報→…）に並べ、一覧外カテゴリは末尾
-    const cats = Object.keys(groups).sort((a, b) => {
-      const ia = MATERIAL_CATEGORIES.indexOf(a), ib = MATERIAL_CATEGORIES.indexOf(b);
-      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
-    });
-    body = cats.map(cat => {
+    // 新しい資料が上：カテゴリで分けず、公開日の新しい順に1列で並べる（同じ日は後から登録した資料が上）。
+    // カテゴリはカードの色・アイコンと、日付の横の小さな表記で示す。
+    const sorted = mats.slice().sort((x, y) =>
+      String(y.publishedAt || '').localeCompare(String(x.publishedAt || '')) || String(y.id || '').localeCompare(String(x.id || '')));
+    body = sorted.map(m => {
+      const cat = m.category || 'その他';
       const c = CATEGORY_COLORS[cat] || CATEGORY_COLORS['その他'];
-      const ic = categoryIcon(cat);
       return `
-      <h2 class="sub">${categoryChip(cat)}</h2>
-      ${groups[cat].map(m => `
         <button class="card-btn cat-docs doc-link" data-id="${escapeAttr(m.id)}" style="background:${c[0]};border-left-color:${c[1]}">
-          <span class="cat-ic" style="color:${c[1]}">${icon(ic, 'ic-lg')}</span>
-          <span class="cat-tx" style="--accent:${c[1]}"><strong style="color:${c[1]}">${escapeHtml(m.title)}</strong><span>${escapeHtml(m.publishedAt || '')}${isNewMaterial(m) ? newBadge() : ''}</span></span>
-        </button>`).join('')}`;
+          <span class="cat-ic" style="color:${c[1]}">${icon(categoryIcon(cat), 'ic-lg')}</span>
+          <span class="cat-tx"><strong style="color:${c[1]}">${escapeHtml(m.title)}</strong><span>${escapeHtml(m.publishedAt || '')}<span class="doc-cat">${escapeHtml(cat)}</span>${isNewMaterial(m) ? newBadge() : ''}</span></span>
+        </button>`;
     }).join('');
   }
 

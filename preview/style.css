@@ -236,12 +236,17 @@ input[type="text"], input[type="tel"], input[type="number"], input:not([type]), 
 
 /* ===== NEW バッジ（直近に更新・募集中の目印） ===== */
 .newbadge {
-  display: inline-block; color: var(--accent, var(--primary)); -webkit-text-fill-color: var(--accent, var(--primary));
-  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
-  margin-left: 8px; line-height: 1;
+  display: inline-block; background: #fce8ec; color: #c2455f; -webkit-text-fill-color: #c2455f;
+  border: 1px solid #f6cdd6; border-radius: 999px;
+  font-size: 0.68rem; font-weight: 700; letter-spacing: 0.06em;
+  padding: 2px 8px; margin-left: 8px; line-height: 1.2; vertical-align: 0.1em;
 }
 
-.card-btn .newbadge { display: inline-block; font-size: 0.72rem; }
+.card-btn .newbadge { display: inline-block; font-size: 0.68rem; color: #c2455f; }
+
+/* お役立ち資料：日付の横のカテゴリ表記 */
+.card-btn .doc-cat { display: inline; margin-left: 2px; font-size: 0.78rem; color: var(--muted); }
+.card-btn .doc-cat::before { content: '・'; margin-right: 2px; }
 
 /* ===== 行事カード内：ひもづいた資料の導線 ===== */
 .docrow { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
