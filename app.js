@@ -453,7 +453,7 @@ async function renderEvents() {
       <p class="muted">${feeText(e)}${e.deadline ? ' ／ 申込締切 ' + escapeHtml(e.deadline) : ''}</p>
       ${eventDocs(e)}
       ${e.signup === 'external'
-        ? '<p class="muted">お申し込み・お問い合わせは、上の案内をご覧ください。</p>'
+        ? externalSignupNote(e)
         : `${e.myResponse ? `<p>${statusBadge('ok', '回答済み')} 大人 ${e.myResponse.adultCount}名・子ども ${e.myResponse.childCount}名${e.myResponse.total > 0 ? '（参加費 ' + e.myResponse.total.toLocaleString() + '円）' : ''}</p>` : ''}
       <button class="btn primary act" data-id="${escapeAttr(e.eventId)}">${e.myResponse ? '回答を変更する' : '出欠を回答する'}</button>`}
     </div>`;
@@ -2220,6 +2220,15 @@ function isNewByDate(publishedAt) {
   if (isNaN(t)) return false;
   return (Date.now() - t) <= NEW_DAYS * 24 * 3600 * 1000 && (Date.now() - t) >= -2 * 24 * 3600 * 1000;
 }
+// 「案内のみ」（外部申込）の行事の申込・問い合わせ先の一文。
+// 案内資料がひもづいていれば「上の案内をご覧ください」、まだ資料がない（予定だけ）なら事務局への問い合わせを案内する。
+const OFFICE_NAME = 'さいたま市里親会事務局';
+const OFFICE_TEL = '048-711-2489';
+function externalSignupNote(e) {
+  if (e && e.materials && e.materials.length) return '<p class="muted">お申し込み・お問い合わせは、上の案内をご覧ください。</p>';
+  return `<p class="muted">お申し込み・お問い合わせは、${OFFICE_NAME}（<a href="tel:${OFFICE_TEL.replace(/-/g, '')}">${OFFICE_TEL}</a>）へお願いします。</p>`;
+}
+
 function newBadge() { return `<span class="newbadge">NEW</span>`; }
 // 資料がNEW＝直近31日に登録 または ひもづく行事がこれから（募集中・開催待。終了で自動的に消える）
 function isNewMaterial(m) { return isNewByDate(m && m.publishedAt) || !!(m && m.eventOpen); }
