@@ -2089,7 +2089,9 @@ function paintAdminMaterials() {
   el.querySelectorAll('button.mat-notify').forEach(b => {
     b.onclick = () => {
       const m = byId(b.dataset.id);
-      renderBroadcastCompose({ text: defaultMaterialNoticeText(m), back: renderAdminMaterials, backLabel: '資料の管理', remember: 'materials' });
+      // 資料ごとに登録した文面があればそれを既定文に、なければ雛形を使う（どちらも送信前に自由に編集できる）
+      const text = (m && m.noticeText && m.noticeText.trim()) ? m.noticeText : defaultMaterialNoticeText(m);
+      renderBroadcastCompose({ text, back: renderAdminMaterials, backLabel: '資料の管理', remember: 'materials' });
     };
   });
   el.querySelectorAll('button.mat-toggle').forEach(b => {
@@ -2259,6 +2261,9 @@ function renderMaterialForm(m) {
       ${m ? '<label>URL（共有リンク）</label>' : ''}
       <input id="m-url" type="url" placeholder="https://drive.google.com/..." value="${escapeAttr(cur.url)}">`}
       <p class="hint">資料はすべて会員限定です（登録会員のみ閲覧）。</p>
+      <label>LINE通知の文面（任意）</label>
+      <textarea id="m-notice" rows="10" style="width:100%;box-sizing:border-box;font-size:0.95rem;line-height:1.5;padding:10px;" maxlength="5000" placeholder="空欄なら「新しい資料を公開しました」の定型文になります">${escapeHtml(cur.noticeText || '')}</textarea>
+      <p class="hint">「📢 LINEにて通知」を押したときに、最初から入っている文面です（送る前に直せます）。友だち全員に届くので、個人の携帯番号などは書かないでください。</p>
       <label class="check"><input type="checkbox" id="m-pub" ${cur.status !== '非公開' ? 'checked' : ''}> 公開する（オフで非公開＝会員にも表示されません）</label>
       <div class="actions">
         <button class="btn back" id="back-btn">‹ 戻る</button>
@@ -2272,6 +2277,7 @@ function renderMaterialForm(m) {
     const category = document.getElementById('m-cat').value;
     const eventId = document.getElementById('m-event').value;
     const status = document.getElementById('m-pub').checked ? '公開' : '非公開';
+    const noticeText = document.getElementById('m-notice').value.trim();
     if (!title) { alert('タイトルは必須です。'); return; }
 
     const fileInput = document.getElementById('m-file');
@@ -2288,7 +2294,7 @@ function renderMaterialForm(m) {
     const urlEl = document.getElementById('m-url');
     const url = urlEl ? urlEl.value.trim() : '';
     if (!isFileMat && !url) { alert('ファイルを選ぶか、URLを入力してください。'); return; }
-    const payload = { title, url, category, status, eventId };
+    const payload = { title, url, category, status, eventId, noticeText };
     if (m) payload.id = m.id;
     const res = await callApi('adminUpsertMaterial', payload);
     if (res.ok) { renderAdminMaterials(); }
