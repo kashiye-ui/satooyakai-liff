@@ -1219,7 +1219,7 @@ function paintAdminEvents() {
   el.querySelectorAll('button.roster-btn').forEach(b => { b.onclick = () => renderAdminRoster(b.dataset.id); });
   el.querySelectorAll('button.ev-edit').forEach(b => { b.onclick = () => renderEventForm(byId(b.dataset.id)); });
   el.querySelectorAll('button.ev-notify').forEach(b => {
-    b.onclick = () => renderBroadcastCompose({ text: defaultEventNoticeText(byId(b.dataset.id)), back: renderAdminEvents, backLabel: '行事の参加者管理', remember: 'events' });
+    b.onclick = () => { const ev = byId(b.dataset.id); renderBroadcastCompose({ text: defaultEventNoticeText(ev), back: renderAdminEvents, backLabel: '行事の参加者管理', remember: 'events', label: ev ? ev.name : '' }); };
   });
   el.querySelectorAll('button.evt-doc').forEach(b => {
     b.onclick = async () => {
@@ -2086,7 +2086,7 @@ function paintAdminMaterials() {
       const m = byId(b.dataset.id);
       // 資料ごとに登録した文面があればそれを既定文に、なければ雛形を使う（どちらも送信前に自由に編集できる）
       const text = (m && m.noticeText && m.noticeText.trim()) ? m.noticeText : defaultMaterialNoticeText(m);
-      renderBroadcastCompose({ text, back: renderAdminMaterials, backLabel: '資料の管理', remember: 'materials' });
+      renderBroadcastCompose({ text, back: renderAdminMaterials, backLabel: '資料の管理', remember: 'materials', label: m ? m.title : '' });
     };
   });
   el.querySelectorAll('button.mat-toggle').forEach(b => {
@@ -2121,7 +2121,7 @@ function defaultEventNoticeText(e) {
   return lines.join('\n');
 }
 
-// opts = { text, back, backLabel, remember }
+// opts = { text, back, backLabel, remember, label }（label＝予約一覧に出す見出し）
 async function renderBroadcastCompose(opts) {
   const o = opts || {};
   const initial = o.text || '';
@@ -2140,10 +2140,19 @@ async function renderBroadcastCompose(opts) {
       <label>配信する文面 <span class="req">*</span></label>
       <textarea id="bc-text" rows="12" style="width:100%;box-sizing:border-box;">${escapeHtml(initial)}</textarea>
       <p class="hint"><span id="bc-count">0</span>/4900字。リンクを載せると会員はタップで資料一覧を開けます（未承認の方は閲覧できません）。</p>
+      <label>配信のタイミング</label>
+      <label class="check"><input type="radio" name="bc-when" value="now" checked> 今すぐ配信する</label>
+      <label class="check"><input type="radio" name="bc-when" value="later"> 日時を指定して予約する</label>
+      <div id="bc-later" style="display:none;">
+        <input id="bc-at" type="datetime-local" step="60" style="width:100%;box-sizing:border-box;padding:10px 12px;font-size:16px;border:1px solid var(--border);border-radius:6px;margin-top:4px;">
+        <p class="hint">日本時間です。指定した時刻から1〜2分のうちに配信されます。送る前なら、下の「予約中の配信」から取り消せます。</p>
+      </div>
       <div class="actions">
         <button class="btn back" id="back-btn">‹ ${escapeHtml(backLabel)}</button>
         <button class="btn primary" id="send-btn">この内容で配信する</button>
       </div>
+      <h2 class="sub">予約中の配信</h2>
+      <div id="bc-sched"><p class="muted">読み込み中...</p></div>
     </section>
   `;
   const ta = document.getElementById('bc-text');
@@ -2170,9 +2179,49 @@ async function renderBroadcastCompose(opts) {
     if (q.remaining < 120) el.className = 'muted warn';
   })();
 
-  document.getElementById('send-btn').onclick = async () => {
+  // 配信のタイミング（今すぐ／予約）の切り替え
+  const atEl = document.getElementById('bc-at');
+  const sendBtn = document.getElementById('send-btn');
+  const isLater = () => (document.querySelector('input[name="bc-when"]:checked') || {}).value === 'later';
+  document.querySelectorAll('input[name="bc-when"]').forEach(r => {
+    r.onchange = () => {
+      document.getElementById('bc-later').style.display = isLater() ? '' : 'none';
+      sendBtn.textContent = isLater() ? 'この日時で予約する' : 'この内容で配信する';
+      if (isLater() && !atEl.value) atEl.value = defaultScheduleValue();
+    };
+  });
+  atEl.min = localDateTimeValue(new Date(Date.now() + 60000));
+  drawScheduledBroadcasts();
+
+  sendBtn.onclick = async () => {
     const text = ta.value.trim();
     if (!text) { alert('文面を入力してください。'); return; }
+    if (isLater()) {
+      const v = atEl.value;
+      if (!v) { alert('配信する日時を入れてください。'); return; }
+      if (new Date(v).getTime() <= Date.now()) { alert('配信日時は、今より後の時刻にしてください。'); return; }
+      if (!confirm(`${formatSendAt(v)} に、公式LINEの友だち全員へ配信するよう予約します。よろしいですか？（送る前なら取り消せます）`)) return;
+      sendBtn.disabled = true; sendBtn.textContent = '予約中...';
+      const r = await callApi('adminScheduleBroadcast', { text, sendAt: v, label: o.label || '' });
+      if (r.ok) {
+        $app.innerHTML = `
+          <section class="screen">
+            <h1>配信を予約しました</h1>
+            <div class="card"><p>⏰ <strong>${escapeHtml(formatSendAt(r.sendAt))}</strong> に、公式LINEの友だち全員へ配信します。</p>
+            <p class="muted">取り消すときは、もう一度「LINEにて通知」を開き、「予約中の配信」から取り消してください。</p></div>
+            <button class="btn back" id="done-btn">‹ ${escapeHtml(backLabel)}</button>
+          </section>`;
+        document.getElementById('done-btn').onclick = backFn;
+      } else {
+        const msg = r.error === 'send_at_past' ? '配信日時が過ぎています。今より後の時刻にしてください。'
+          : r.error === 'send_at_too_far' ? '予約できるのは60日先までです。'
+          : r.error === 'no_token' ? '配信用トークンが未設定です。'
+          : (r.error || 'unknown');
+        alert('予約できませんでした：' + msg);
+        sendBtn.disabled = false; sendBtn.textContent = 'この日時で予約する';
+      }
+      return;
+    }
     if (!confirm('公式LINEの友だち全員に配信します。送信後は取り消せません。よろしいですか？')) return;
     const btn = document.getElementById('send-btn');
     btn.disabled = true; btn.textContent = '配信中...';
@@ -2193,6 +2242,53 @@ async function renderBroadcastCompose(opts) {
       btn.disabled = false; btn.textContent = 'この内容で配信する';
     }
   };
+}
+
+// 予約中の配信（と最近の結果）を通知画面の下に描く。予約中は取り消せる。
+async function drawScheduledBroadcasts() {
+  const el = document.getElementById('bc-sched');
+  if (!el) return;
+  const r = await callApi('adminListScheduledBroadcasts', {});
+  if (!document.getElementById('bc-sched')) return;
+  if (!r.ok) { el.innerHTML = `<p class="muted">予約の一覧を読み込めませんでした（${escapeHtml(r.error || '')}）。</p>`; return; }
+  const head = (b) => escapeHtml(b.label || (b.text || '').split('\n')[0].slice(0, 40));
+  const pend = (r.pending || []).map(b => `
+    <div class="card">
+      <p><strong>⏰ ${escapeHtml(formatSendAt(b.sendAt))}</strong> ${b.status === '送信中' ? statusBadge('hold', '送信中') : statusBadge('ok', '予約中')}</p>
+      <p class="muted">${head(b)}</p>
+      ${b.status === '予約中' ? `<button class="btn bc-cancel" data-id="${escapeAttr(String(b.id))}">この予約を取り消す</button>` : ''}
+    </div>`).join('');
+  const kind = (s) => s === '送信済' ? 'ok' : s === '失敗' ? 'todo' : 'off';
+  const rec = (r.recent || []).map(b => `
+    <p class="muted">${statusBadge(kind(b.status), b.status)} ${escapeHtml(formatSendAt(b.sendAt))} ${head(b)}${b.error ? `<br>⚠️ ${escapeHtml(b.error)}` : ''}</p>`).join('');
+  el.innerHTML = (pend || '<p class="muted">予約中の配信はありません。</p>')
+    + (rec ? `<details style="margin-top:8px;"><summary class="muted">これまでの予約配信（最近10件）</summary>${rec}</details>` : '');
+  el.querySelectorAll('button.bc-cancel').forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm('この予約を取り消します。よろしいですか？')) return;
+      btn.disabled = true;
+      const c = await callApi('adminCancelScheduledBroadcast', { id: btn.dataset.id });
+      if (!c.ok) alert(c.error === 'not_cancellable' ? 'すでに送信が始まっているか、取り消し済みです。' : '取り消せませんでした：' + (c.error || 'unknown'));
+      drawScheduledBroadcasts();
+    };
+  });
+}
+// <input type="datetime-local"> 用の 'YYYY-MM-DDTHH:MM'（端末の時刻＝日本時間）
+function localDateTimeValue(d) {
+  const p2 = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}T${p2(d.getHours())}:${p2(d.getMinutes())}`;
+}
+// 予約の初期値＝翌日の朝9:00
+function defaultScheduleValue() {
+  const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0);
+  return localDateTimeValue(d);
+}
+// 'YYYY-MM-DD HH:MM' / 'YYYY-MM-DDTHH:MM' → '11月8日（日）9:00'
+function formatSendAt(v) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(String(v || ''));
+  if (!m) return String(v || '');
+  const wd = '日月火水木金土'[new Date(+m[1], +m[2] - 1, +m[3]).getDay()];
+  return `${+m[2]}月${+m[3]}日（${wd}）${+m[4]}:${m[5]}`;
 }
 
 const MATERIAL_CATEGORIES = ['イベント', '会報', '総会資料', 'Q&A', '支援・寄贈情報', 'その他'];
